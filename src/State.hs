@@ -49,7 +49,7 @@ instance Monad (State s) where
 
   (>>=) :: State s a -> (a -> State s b) -> State s b
   st >>= f = S $ \s ->
-     let (a, s') = runState st s
+    let (a, s') = runState st s
      in runState (f a) s'
 
 {-
@@ -118,7 +118,6 @@ a new state *inside* a state monad. The old state is thrown away.
 
 modify :: (s -> s) -> State s ()
 modify f = S $ \s -> ((), f s)
-
 
 {-
 [1]: http://hackage.haskell.org/packages/archive/mtl/latest/doc/html/Control-Monad-State-Lazy.html#g:2
