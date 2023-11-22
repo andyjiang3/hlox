@@ -3,7 +3,7 @@
 -- All `Parser`s must be built using the following functions
 -- exported by this file, as well as the `Functor`, `Applicative` and
 -- `Alternative` operations.
-module Parser
+module ParserLib
   ( Parser,
     doParse,
     get,
@@ -34,8 +34,8 @@ import Control.Applicative (Alternative (..))
 import Control.Monad (guard)
 import Data.Char
 import Data.Foldable (asum)
-import qualified System.IO as IO
-import qualified System.IO.Error as IO
+import System.IO qualified as IO
+import System.IO.Error qualified as IO
 import Text.Read (readMaybe)
 import Prelude hiding (filter)
 

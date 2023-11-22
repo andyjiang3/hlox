@@ -41,6 +41,9 @@ library
       common-stanza
   exposed-modules:
       Lib
+      LoxParser
+      LoxSyntax 
+      ParserLib
   hs-source-dirs:
       src
 

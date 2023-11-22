@@ -1,4 +1,4 @@
-module Syntax where
+module LoxSyntax where
 
 import Control.Monad (mapM_)
 import Data.Char qualified as Char
@@ -22,20 +22,25 @@ type Name = String -- name of a variable
 
 -- produce an effect
 data Statement
-  = Assign LValue Expression -- x = e
-  | If Expression Block Block -- if (e) { s1 } else {s2}
+  = Assign LValue Expression -- var x = e
+  | If Expression Block Block -- if (e) { s1 } else { s2 }
   | While Expression Block -- while (e) { s }
+  | For Name Expression Block -- for (var x = e; e; e) { s }, TODO: make sure this is correct
+  | FunctionCallStatement Expression [Expression] -- f(e1, ..., en), TODO: Name instead of expresssion?
+  | FunctionDef Name [Name] Block -- fun f(x1, ..., xn) { s }
   | Return Expression -- return e
+  | Print Expression -- print e
   | Empty -- ';'
   deriving (Eq, Show)
 
--- produce a value
+-- produce a value, can be assigned or used as an operand
 data Expression
   = Var Name -- global variables x
   | Val Value -- literal values
   | Op1 Uop Expression -- unary operators
   | Op2 Expression Bop Expression -- binary operators
   | Grouping Expression -- (e)
+  | FunctionCall Expression [Expression] -- f(e1, ..., en)
   deriving (Eq, Show)
 
 data LValue
@@ -65,7 +70,7 @@ data Bop
   | Minus -- `-`  :: Int -> Int -> Int
   | Times -- `*`  :: Int -> Int -> Int
   | Divide -- `/` :: Int -> Int -> Int   -- floor division
-  | Modulo -- `%`  :: Int -> Int -> Int   -- modulo
+  | Modulo -- `%`  :: Int -> Int -> Int
   | Eq -- `==` :: a -> a -> Bool
   | Ne -- `!=` :: a -> a -> Bool
   | Gt -- `>`  :: a -> a -> Bool
@@ -79,7 +84,7 @@ reserved =
   [ "and",
     "class", -- for class
     "else",
-    "else if", -- todo: figure out edge case with spacing
+    "else if", -- TODO: figure out edge case with spacing
     "false",
     "for",
     "fun",
@@ -92,5 +97,6 @@ reserved =
     "this", -- for class
     "true",
     "var",
-    "while"
+    "while",
+    "print" -- do we like this
   ]
