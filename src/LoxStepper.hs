@@ -20,7 +20,7 @@ type Environment = Map Name Table
 
 type Table = Map Value Value
 
-data Store = St { environment :: Environment, parent :: Maybe Environment}
+data Store = St {environment :: Environment, parent :: Maybe Environment} deriving (Eq, Show)
 
 globalTableName  :: Name
 globalTableName = "_G"
@@ -61,6 +61,21 @@ index (t, n) = do
   let valMaybe = let env = environment store in env !? t >>= (!? n)
   return $ fromMaybe NilVal valMaybe
 
+
+update :: Reference -> Value -> State Store ()
+update (_, NilVal) _ = return ()
+update (table, name) val = do
+  store <- S.get
+  let newStore :: Maybe Store =
+        do
+          oldEnv <- environment store !? table
+          let newTable =
+                if val == NilVal
+                  then Map.delete name oldEnv
+                  else Map.insert name val oldEnv
+          return $ store {environment = Map.insert table newTable (environment store)}
+  S.put $ fromMaybe store newStore
+
 test_index :: Test
 test_index =
   "index tests" ~:
@@ -72,11 +87,11 @@ test_index =
         -- If a table name is not found in the store, accessing its reference also returns nil.
         S.evalState (index yref) initialStore ~?= NilVal,
         -- We should also be able to access "t[1]" in the extended store
-        S.evalState (index yref) extendedStore ~?= BoolVal True
+        S.evalState (index yref) extendedStore ~?= BoolVal True,
         -- Updates using the `nil` key are ignored
-        --S.execState (update ("_t1", NilVal) (IntVal 3)) extendedStore ~?= extendedStore
+        let u = S.execState (update ("_t1", NilVal) (IntVal 3)) extendedStore in u ~?= extendedStore
       ]
 
 -- >>> runTestTT test_index
--- Counts {cases = 4, tried = 4, errors = 0, failures = 0}
+-- Counts {cases = 5, tried = 5, errors = 0, failures = 0}
 
