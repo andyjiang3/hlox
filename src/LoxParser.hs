@@ -47,68 +47,65 @@ stringValP :: Parser Value
 stringValP = StringVal <$> wsP (P.between (P.string "\"") (many (P.satisfy (/= '"'))) (P.string "\""))
 
 -- Expression parser --
--- expP :: Parser Expression
--- expP = orP
---   where
--- 	orP = andP `P.chainl1` opAtLevel (level Or)
--- 	andP = equalityP `P.chainl1` opAtLevel (level And)
--- 	equalityP = compP `P.chainl1` opAtLevel (level Eq)
---     compP = sumP `P.chainl1` opAtLevel (level Lt)
---     sumP = timesP `P.chainl1` opAtLevel (level Plus)
---     timesP = uopexpP `P.chainl1` opAtLevel (level Times)
--- 	funcCallP =
---     uopexpP =
---       baseP
---         <|> Op1 <$> uopP <*> uopexpP
---     baseP =
---       tableConstP
---         <|> Var <$> varP
---         <|> parens expP      -- Supports Grouping in Lox
---         <|> Val <$> valueP
+expP :: Parser Expression
+expP = orP
+  where
+    orP = andP `P.chainl1` opAtLevel (level Or)
+    andP = equalityP `P.chainl1` opAtLevel (level And)
+    equalityP = compP `P.chainl1` opAtLevel (level Eq)
+    compP = sumP `P.chainl1` opAtLevel (level Lt)
+    sumP = timesP `P.chainl1` opAtLevel (level Plus)
+    timesP = uopexpP `P.chainl1` opAtLevel (level Times)
+    funcCallP = funcCallExpP uopexpP -- TODO: support array index
+    uopexpP =
+      baseP
+        <|> Op1 <$> uopP <*> uopexpP
+    baseP =
+      parens expP -- Supports Grouping in Lox -- TODO: support array
+        <|> Var <$> varP
+        <|> Val <$> valueP
 
--- -- | Parse an operator at a specified precedence level
--- opAtLevel :: Int -> Parser (Expression -> Expression -> Expression)
--- opAtLevel l = flip Op2 <$> P.filter (\x -> level x == l) bopP
+-- | Parse an operator at a specified precedence level
+opAtLevel :: Int -> Parser (Expression -> Expression -> Expression)
+opAtLevel l = flip Op2 <$> P.filter (\x -> level x == l) bopP
 
 -- >>>  P.parse (many varP) "x y z"
--- Right [Name "x", Name "y", Name "z"]
+-- Right ["x","y","z"]
 -- >>> P.parse varP "(x.y[1]).z"
--- Right (Dot (Var (Proj (Var (Dot (Var (Name "x")) "y")) (Val (IntVal 1)))) "z")
--- varP :: Parser Var
--- varP = mkVar <$> prefixP <*> some indexP <|> Name <$> nameP
---   where
---     mkVar :: Expression -> [Expression -> Var] -> Var
---     mkVar e l = foldr1 (\f p u -> p (Var (f u))) l e
+-- Left "No parses"
+varP :: Parser Name
+varP = wsP $ P.filter (`notElem` LoxSyntax.reserved) ((:) <$> (P.alpha <|> P.char '_') <*> many (P.alpha <|> P.digit <|> P.char '_'))
 
---     prefixP :: Parser Expression
---     prefixP = parens expP <|> Var . Name <$> nameP
+-- >>> P.parse (many uopP) "- - !"
+-- Right [Neg,Neg,Not]
 
---     indexP :: Parser (Expression -> Var)
---     indexP =
---       flip Dot <$> (P.string "." *> nameP)
---         <|> flip Proj <$> brackets expP
+-- >>> P.parse (many uopP) "! - test hi"
+-- Right [Not,Neg]
+uopP :: Parser Uop
+uopP = constP "-" Neg <|> constP "!" Not
 
--- -- >>> P.parse (many nameP) "x sfds _ nil"
--- -- Right ["x","sfds","_"]
+-- >>> P.parse (many bopP) "+ >= test"
+-- Right [Plus,Gt]
 
--- nameP :: Parser Name
--- nameP = wsP $ P.filter (`notElem` LoxSyntax.reserved) ((:) <$> (P.alpha <|> P.char '_') <*> many (P.alpha <|> P.digit <|> P.char '_'))
+-- >>> P.parse (many bopP) "+ - * / % or and == != > >= < <= .."
+-- Right [Plus,Minus,Times,Divide,Modulo,Or,And,Eq,Ne,Gt,Gt]
+bopP :: Parser Bop
+bopP =
+  constP "+" Plus
+    <|> constP "-" Minus
+    <|> constP "*" Times
+    <|> constP "/" Divide
+    <|> constP "%" Modulo
+    <|> constP "or" Or
+    <|> constP "and" And
+    <|> constP "==" Eq
+    <|> constP "!=" Ne
+    <|> constP ">" Gt
+    <|> constP ">=" Ge
+    <|> constP "<" Lt
+    <|> constP "<=" Le
 
--- -- >>> P.parse (many uopP) "- - #"
--- -- Right [Neg,Neg,Len]
-
--- -- >>> P.parse (many uopP) "not # - test hi"
--- -- Right [Not,Len,Neg]
--- uopP :: Parser Uop
--- uopP = constP "-" Neg <|> constP "#" Len <|> constP "not" Not
-
--- -- >>> P.parse (many bopP) "+ >= .."
--- -- Right [Plus,Ge,Concat]
-
--- -- >>> P.parse (many bopP) "- * // % == >= > <= < .."
--- -- Right [Minus,Times,Divide,Modulo,Eq,Ge,Gt,Le,Lt,Concat]
--- bopP :: Parser Bop
--- bopP = constP "+" Plus <|> constP "-" Minus <|> constP "*" Times <|> constP "//" Divide <|> constP "%" Modulo <|> constP "==" Eq <|> constP ">=" Ge <|> constP ">" Gt <|> constP "<=" Le <|> constP "<" Lt <|> constP ".." Concat
+funcCallExpP = undefined
 
 -- -- >>> P.parse tableConstP "{ x = 2, [3] = false }"
 -- -- Right (TableConst [FieldName "x" (Val (IntVal 2)),FieldKey (Val (IntVal 3)) (Val (BoolVal False))])

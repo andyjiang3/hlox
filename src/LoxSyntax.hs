@@ -40,13 +40,13 @@ data Expression
   | Val Value -- literal values
   | Op1 Uop Expression -- unary operators
   | Op2 Expression Bop Expression -- binary operators
-  | -- | Grouping Expression -- (e) TODO: support
+  | -- TODO: Support array, a[i] and [e1, ..., en]
     FunctionCall Expression [Expression] -- f(e1, ..., en)
   deriving (Eq, Show)
 
 data LValue
   = LName Name -- x, global variable
-  | LArrayIndex LValue Expression -- a[i], TODO: support
+  | LArrayIndex LValue Expression -- a[i], a[i][j], TODO: support
   deriving (Eq, Show)
 
 data Value -- literals
