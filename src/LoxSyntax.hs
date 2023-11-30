@@ -22,7 +22,8 @@ type Name = String -- name of a variable
 
 -- produce an effect
 data Statement
-  = Assign LValue Expression -- var x = e
+  = Assign LValue Expression -- x = e, a[i] = e, TODO: support
+  | VarDecl Name Expression -- var x = e
   | If Expression Block Block -- if (e) { s1 } else { s2 }
   | While Expression Block -- while (e) { s }
   | For Name Expression Block -- for (var x = e; e; e) { s }, TODO: make sure this is correct
@@ -39,8 +40,8 @@ data Expression
   | Val Value -- literal values
   | Op1 Uop Expression -- unary operators
   | Op2 Expression Bop Expression -- binary operators
-  | Grouping Expression -- (e)
-  | FunctionCall Expression [Expression] -- f(e1, ..., en)
+  | -- | Grouping Expression -- (e) TODO: support
+    FunctionCall Expression [Expression] -- f(e1, ..., en)
   deriving (Eq, Show)
 
 data LValue

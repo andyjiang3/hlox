@@ -32,7 +32,7 @@ brackets x = P.between (stringP "[") x (stringP "]")
 
 -- Basic parsers --
 valueP :: Parser Value
-valueP = constP "var" () *> (intValP <|> boolValP <|> nilValP <|> stringValP) -- TODO: make sure this works
+valueP = intValP <|> boolValP <|> nilValP <|> stringValP
 
 intValP :: Parser Value
 intValP = IntVal <$> wsP P.int
@@ -46,26 +46,27 @@ nilValP = constP "nil" NilVal
 stringValP :: Parser Value
 stringValP = StringVal <$> wsP (P.between (P.string "\"") (many (P.satisfy (/= '"'))) (P.string "\""))
 
--- -- Expression parser --
+-- Expression parser --
 -- expP :: Parser Expression
 -- expP = orP
 --   where
 -- 	orP = andP `P.chainl1` opAtLevel (level Or)
 -- 	andP = equalityP `P.chainl1` opAtLevel (level And)
 -- 	equalityP = compP `P.chainl1` opAtLevel (level Eq)
---     compP = sumP `P.chainl1` opAtLevel (level Gt)
---     sumP = prodP `P.chainl1` opAtLevel (level Plus)
---     prodP = uopexpP `P.chainl1` opAtLevel (level Times)
+--     compP = sumP `P.chainl1` opAtLevel (level Lt)
+--     sumP = timesP `P.chainl1` opAtLevel (level Plus)
+--     timesP = uopexpP `P.chainl1` opAtLevel (level Times)
+-- 	funcCallP =
 --     uopexpP =
 --       baseP
 --         <|> Op1 <$> uopP <*> uopexpP
 --     baseP =
 --       tableConstP
 --         <|> Var <$> varP
---         <|> parens expP
+--         <|> parens expP      -- Supports Grouping in Lox
 --         <|> Val <$> valueP
 
--- | Parse an operator at a specified precedence level
+-- -- | Parse an operator at a specified precedence level
 -- opAtLevel :: Int -> Parser (Expression -> Expression -> Expression)
 -- opAtLevel l = flip Op2 <$> P.filter (\x -> level x == l) bopP
 
