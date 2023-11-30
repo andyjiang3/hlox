@@ -40,7 +40,6 @@ library
   import:
       common-stanza
   exposed-modules:
-      Lib
       LoxParser
       LoxSyntax 
       ParserLib
