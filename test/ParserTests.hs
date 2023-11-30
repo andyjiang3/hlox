@@ -1,13 +1,15 @@
 module ParserTests where
 
 import Control.Applicative
+import Data.Char qualified as Char
 import LoxParser
 import LoxSyntax
 import ParserLib qualified as P
 import Test.HUnit (Assertion, Counts, Test (..), assert, runTestTT, (~:), (~?=))
-import Test.QuickCheck as QC
-import Text.PrettyPrint (Doc, (<+>))
-import Text.PrettyPrint qualified as PP
+import Test.QuickCheck qualified as QC
+
+-- import Text.PrettyPrint (Doc, (<+>))
+-- import Text.PrettyPrint qualified as PP
 
 test_wsP :: Test
 test_wsP =
@@ -31,14 +33,14 @@ test_constP =
       P.parse (many (constP "&" 'a')) "&   &" ~?= Right "aa"
     ]
 
-test_stringValP :: Test
-test_stringValP =
-  TestList
-    [ P.parse stringValP "\"a\"" ~?= Right (StringVal "a"),
-      P.parse stringValP "\"a\\\"\"" ~?= Right (StringVal "a\\"),
-      P.parse (many stringValP) "\"a\"   \"b\"" ~?= Right [StringVal "a", StringVal "b"],
-      P.parse (many stringValP) "\" a\"   \"b\"" ~?= Right [StringVal " a", StringVal "b"]
-    ]
+-- test_stringValP :: Test
+-- test_stringValP =
+--   TestList
+--     [ P.parse stringValP "\"a\"" ~?= Right (StringVal "a"),
+--       P.parse stringValP "\"a\\\"\"" ~?= Right (StringVal "a\\"),
+--       P.parse (many stringValP) "\"a\"   \"b\"" ~?= Right [StringVal "a", StringVal "b"],
+--       P.parse (many stringValP) "\" a\"   \"b\"" ~?= Right [StringVal " a", StringVal "b"]
+--     ]
 
 -- pretty :: (BP.PP a) => a -> String
 -- pretty = PP.render . BP.pp

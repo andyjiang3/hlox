@@ -71,6 +71,8 @@ data Bop
   | Times -- `*`  :: Int -> Int -> Int
   | Divide -- `/` :: Int -> Int -> Int   -- floor division
   | Modulo -- `%`  :: Int -> Int -> Int
+  | Or -- `or` :: Bool -> Bool -> Bool
+  | And -- `and` :: Bool -> Bool -> Bool
   | Eq -- `==` :: a -> a -> Bool
   | Ne -- `!=` :: a -> a -> Bool
   | Gt -- `>`  :: a -> a -> Bool
@@ -100,3 +102,18 @@ reserved =
     "while",
     "print" -- do we like this
   ]
+
+level :: Bop -> Int
+level Times = 13
+level Divide = 13
+level Modulo = 13
+level Plus = 11
+level Minus = 11
+level Gt = 7
+level Ge = 7
+level Lt = 7
+level Le = 7
+level Eq = 5
+level Ne = 5
+level And = 4
+level Or = 3

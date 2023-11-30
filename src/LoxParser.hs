@@ -18,6 +18,9 @@ stringP s = wsP (P.string s) *> pure ()
 constP :: String -> a -> Parser a
 constP p x = wsP (P.string p) *> pure x
 
+-- removeSpacesAround :: Parser a -> Parser a
+-- removeSpacesAround p = many P.space *> p <* many P.space
+
 parens :: Parser a -> Parser a
 parens x = P.between (stringP "(") x (stringP ")")
 
@@ -27,8 +30,9 @@ braces x = P.between (stringP "{") x (stringP "}")
 brackets :: Parser a -> Parser a
 brackets x = P.between (stringP "[") x (stringP "]")
 
+-- Basic parsers --
 valueP :: Parser Value
-valueP = intValP <|> boolValP <|> nilValP <|> stringValP
+valueP = constP "var" () *> (intValP <|> boolValP <|> nilValP <|> stringValP) -- TODO: make sure this works
 
 intValP :: Parser Value
 intValP = IntVal <$> wsP P.int
@@ -42,11 +46,14 @@ nilValP = constP "nil" NilVal
 stringValP :: Parser Value
 stringValP = StringVal <$> wsP (P.between (P.string "\"") (many (P.satisfy (/= '"'))) (P.string "\""))
 
+-- -- Expression parser --
 -- expP :: Parser Expression
--- expP = compP
+-- expP = orP
 --   where
---     compP = catP `P.chainl1` opAtLevel (level Gt)
---     catP = sumP `P.chainl1` opAtLevel (level Concat)
+-- 	orP = andP `P.chainl1` opAtLevel (level Or)
+-- 	andP = equalityP `P.chainl1` opAtLevel (level And)
+-- 	equalityP = compP `P.chainl1` opAtLevel (level Eq)
+--     compP = sumP `P.chainl1` opAtLevel (level Gt)
 --     sumP = prodP `P.chainl1` opAtLevel (level Plus)
 --     prodP = uopexpP `P.chainl1` opAtLevel (level Times)
 --     uopexpP =
@@ -58,7 +65,7 @@ stringValP = StringVal <$> wsP (P.between (P.string "\"") (many (P.satisfy (/= '
 --         <|> parens expP
 --         <|> Val <$> valueP
 
--- -- | Parse an operator at a specified precedence level
+-- | Parse an operator at a specified precedence level
 -- opAtLevel :: Int -> Parser (Expression -> Expression -> Expression)
 -- opAtLevel l = flip Op2 <$> P.filter (\x -> level x == l) bopP
 
