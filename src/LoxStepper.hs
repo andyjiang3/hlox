@@ -94,3 +94,39 @@ test_index =
 
 -- >>> runTestTT test_index
 -- Counts {cases = 4, tried = 4, errors = 0, failures = 0}
+
+evalE :: Expression -> State Store Value
+evalE (Var name) = index (globalTableName, StringVal name)
+evalE (Val v) = return v
+evalE (Op2 e1 o e2) = evalOp2 o <$> evalE e1 <*> evalE e2
+evalE (Op1 o e1) = do
+  store <- S.get
+  v <- evalE e1
+  return $ evalOp1 store o v
+evalE _ = undefined
+
+evalOp1 :: Store -> Uop -> Value -> Value
+evalOp1 _ Neg (IntVal i) = IntVal (-i)
+evalOp1 _ Not c = BoolVal (not (toBool c))
+evalOp1 _ _ _ = NilVal
+
+evalOp2 :: Bop -> Value -> Value -> Value
+evalOp2 Plus (IntVal i1) (IntVal i2) = IntVal (i1 + i2)
+evalOp2 Minus (IntVal i1) (IntVal i2) = IntVal (i1 - i2)
+evalOp2 Times (IntVal i1) (IntVal i2) = IntVal (i1 * i2)
+evalOp2 Divide (IntVal i1) (IntVal i2) = if i2 /= 0 then IntVal (i1 `div` i2) else NilVal
+evalOp2 Modulo (IntVal i1) (IntVal i2) = if i2 /= 0 then IntVal (i1 `mod` i2) else NilVal
+evalOp2 Eq v1 v2 = BoolVal (v1 == v2)
+evalOp2 Gt v1 v2 = BoolVal (v1 > v2)
+evalOp2 Ge v1 v2 = BoolVal (v1 >= v2)
+evalOp2 Lt v1 v2 = BoolVal (v1 < v2)
+evalOp2 Le v1 v2 = BoolVal (v1 <= v2)
+evalOp2 _ _ _ = NilVal
+
+evaluate :: Expression -> Store -> Value
+evaluate e = S.evalState (evalE e)
+
+toBool :: Value -> Bool
+toBool (BoolVal False) = False
+toBool NilVal = False
+toBool _ = True
