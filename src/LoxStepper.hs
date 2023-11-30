@@ -13,6 +13,7 @@ import State qualified as S
 import Data.List qualified as List
 import Control.Monad (guard)
 import Data.Map (Map, (!?))
+import Text.Read (readMaybe)
 import Data.Map qualified as Map
 import Data.Maybe (fromMaybe, isJust, isNothing)
 
@@ -204,6 +205,10 @@ storeTests = TestList [test_index, test_update, test_allocate]
 -- Counts {cases = 6, tried = 6, errors = 0, failures = 0}
 
 
+resolve :: LValue -> Reference
+resolve (LName n) = (globalTableName, StringVal n)
+resolve _ = undefined
+
 eval :: Expression -> State Store Value
 eval (Var name) = index (globalTableName, StringVal name)
 eval (Val v) = return v
@@ -299,3 +304,159 @@ evaluateTests = TestList [test_evaluate_nested, test_evaluate_literals, test_eva
 
 -- >>> runTestTT evaluateTests
 -- Counts {cases = 21, tried = 21, errors = 0, failures = 0}
+
+
+
+-- Everything here is not sure
+
+
+
+eval' :: Block -> State Store ()
+eval' (Block ss) = mapM_ evalS ss
+
+evalS :: Statement -> State Store ()
+evalS (Assign lv e) = do 
+    val <- eval e
+    let ref = resolve lv
+    update ref val
+evalS (VarDecl n e ) = do
+    val <- eval e
+    let ref = (globalTableName, StringVal n)
+    allocate ref val
+evalS _ = undefined
+
+exec :: Block -> Store -> Store
+exec = S.execState . eval'
+
+
+step :: Block -> State Store Block
+step b@(Block []) = return b
+step (Block (If e (Block b1) (Block b2) : ss)) = do
+  v <- eval e
+  return $ Block $ if toBool v then b1 ++ ss else b2 ++ ss
+step b@(Block (While e wb@(Block []) : ss)) = do
+  v <- eval e
+  if toBool v
+    then return b -- infinite while loop because loop is empty
+    else return $ Block ss
+step (Block w@(While e wb : ss)) = do
+  v <- eval e
+  if toBool v
+    then do
+      case wb of
+        Block bs -> return $ Block $ bs ++ w
+    else -- return (wb : w)
+      return $ Block ss
+step (Block (s : ss)) = do
+  evalS s
+  return $ Block ss
+
+
+
+boundedStep :: Int -> Block -> State Store Block
+boundedStep i b | i > 0 = do
+  b' <- step b
+  boundedStep (i - 1) b'
+boundedStep _ b = return b
+
+steps :: Int -> Block -> Store -> (Block, Store)
+steps n block = S.runState (boundedStep n block)
+
+
+data Stepper = Stepper
+  { filename :: Maybe String,
+    block :: Block,
+    store :: Store,
+    history :: Maybe Stepper
+  }
+
+initialStepper :: Stepper
+initialStepper =
+  Stepper
+    { filename = Nothing,
+      block = mempty,
+      store = initialStore,
+      history = Nothing
+    }
+
+
+-- stepper :: IO ()
+-- stepper = go initialStepper
+--   where
+--     go :: Stepper -> IO ()
+--     go ss = do
+--       prompt ss
+--       putStr (fromMaybe "Lu" (filename ss) ++ "> ")
+--       str <- getLine
+--       case List.uncons (words str) of
+--         -- load a file for stepping
+--         Just (":l", [fn]) -> do
+--           result <- LoxParser.parseLoxFile fn
+--           case result of
+--             (Left _) -> do
+--               putStrLn "invalid file"
+--               go ss
+--             (Right blck) -> do
+--               putStrLn ("Loaded " ++ fn ++ " ,initializing stepper")
+--               go ss {filename = Just fn, block = blck}
+--         -- go ss2
+--         -- dump the store
+--         Just (":d", _) -> do
+--           putStrLn (pretty (store ss))
+--           go ss
+--         -- quit the stepper
+--         Just (":q", _) -> return ()
+--         -- run current block to completion
+--         Just (":r", _) ->
+--           let s' = exec (block ss) (store ss)
+--            in go ss {block = mempty, store = s', history = Just ss}
+--         -- next statement (could be multiple)
+--         Just (":n", strs) -> do
+--           let numSteps :: Int
+--               numSteps = case readMaybe (concat strs) of
+--                 Just x -> x
+--                 Nothing -> 1
+
+--           let res = exec numSteps ss in go res
+--           where
+--             exec n stepper
+--               | n <= 0 = stepper
+--               | case block stepper of Block xs -> null xs = stepper
+--               | otherwise = case history stepper of
+--                   Just prevStepper -> exec (n - 1) $ stepper {block = newBlock, store = newStore, history = Just stepper {history = Just prevStepper}}
+--                   Nothing -> exec (n - 1) $ stepper {block = newBlock, store = newStore, history = Just stepper}
+--               where
+--                 (newBlock, newStore) = steps 1 (block stepper) (store stepper)
+--         -- let (b', s') = steps numSteps (block ss) (store ss)
+--         --   in go ss {block = b', store = s', history = Just ss}
+--         -- go ss
+
+--         -- previous statement
+--         -- NOTE: this should revert steps of the evaluator not
+--         -- commands to the stepper. With :n 5 followed by :p
+--         -- it should back up a single statement, not five statements.
+--         Just (":p", strs) -> do
+--           let numSteps :: Int
+--               numSteps = case readMaybe (concat strs) of
+--                 Just x -> x
+--                 Nothing -> 1
+--           let res = reverse numSteps ss in go res
+--           where
+--             reverse n stepper
+--               | n <= 0 = stepper -- Nothing to reverse
+--               | otherwise = case history stepper of
+--                   Just prevStepper -> reverse (n - 1) prevStepper
+--                   Nothing -> stepper
+--         -- evaluate an expression in the current state
+--         _ -> case LuParser.parseLuExp str of
+--           Right exp -> do
+--             let v = evaluate exp (store ss)
+--             putStrLn (pretty v)
+--             go ss
+--           Left _s -> do
+--             putStrLn "?"
+--             go ss
+--     prompt :: Stepper -> IO ()
+--     prompt Stepper {block = Block []} = return ()
+--     prompt Stepper {block = Block (s : _)} =
+--       putStr "--> " >> putStrLn (pretty s)
