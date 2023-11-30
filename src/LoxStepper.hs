@@ -197,10 +197,105 @@ test_allocate =
         S.evalState (allocate xref (IntVal 4) >> index xref) extendedStore ~?= IntVal 3
       ]
 
+storeTests :: Test
+storeTests = TestList [test_index, test_update, test_allocate]
 
--- >>> runTestTT test_index
+-- >>>runTestTT test_update
 -- Counts {cases = 6, tried = 6, errors = 0, failures = 0}
 
 
--- >>> runTestTT test_update
--- Counts {cases = 7, tried = 7, errors = 0, failures = 1}
+eval :: Expression -> State Store Value
+eval (Var name) = index (globalTableName, StringVal name)
+eval (Val v) = return v
+eval (Op2 e1 o e2) = evalOp2 o <$> eval e1 <*> eval e2
+eval (Op1 _o _e1) = eval _e1 >>= evalOp1 _o
+eval _ = undefined
+
+
+toBool :: Value -> Bool
+toBool (BoolVal False) = False
+toBool NilVal = False
+toBool _ = True
+
+evalOp1 :: Uop -> Value -> State Store Value
+evalOp1 Neg (IntVal i) = return $ IntVal $ -i
+evalOp1 Not v = return $ BoolVal $ not $ toBool v
+evalOp1 _ _ = return NilVal
+
+evalOp2 :: Bop -> Value -> Value -> Value
+evalOp2 Plus (IntVal i1) (IntVal i2) = IntVal (i1 + i2)
+evalOp2 Minus (IntVal i1) (IntVal i2) = IntVal (i1 - i2)
+evalOp2 Times (IntVal i1) (IntVal i2) = IntVal (i1 * i2)
+evalOp2 Divide (IntVal _) (IntVal 0) = NilVal
+evalOp2 Divide (IntVal i1) (IntVal i2) = IntVal (i1 `div` i2)
+evalOp2 Modulo (IntVal _) (IntVal 0) = NilVal
+evalOp2 Modulo (IntVal i1) (IntVal i2) = IntVal (i1 `mod` i2)
+evalOp2 Eq v1 v2 = BoolVal $ v1 == v2
+evalOp2 Gt v1 v2 = BoolVal $ v1 > v2
+evalOp2 Ge v1 v2 = BoolVal $ v1 >= v2
+evalOp2 Lt v1 v2 = BoolVal $ v1 < v2
+evalOp2 Le v1 v2 = BoolVal $ v1 <= v2
+evalOp2 _ _ _ = NilVal
+
+
+evaluate :: Expression -> Store -> Value
+evaluate e = S.evalState (eval e)
+
+
+test_evaluate_unops :: Test
+test_evaluate_unops =
+  "evaluate unops"
+    ~: TestList
+      [ evaluate (Op1 Not (Val NilVal)) initialStore ~?= BoolVal True,
+        evaluate (Op1 Not (Val (IntVal 3))) initialStore ~?= BoolVal False,
+        evaluate (Op1 Neg (Val (IntVal 3))) initialStore ~?= IntVal (-3),
+        evaluate (Op1 Neg (Val (IntVal 0))) initialStore ~?= IntVal 0
+      ]
+
+test_evaluate_binops :: Test
+test_evaluate_binops =
+  "evaluate binops"
+    ~: TestList
+      [ evaluate (Op2 (Val (IntVal 3)) Plus (Val (IntVal 5))) initialStore ~?= IntVal 8,
+        evaluate (Op2 (Val (IntVal 10)) Minus (Val (IntVal 5))) initialStore ~?= IntVal 5,
+        evaluate (Op2 (Val (IntVal 9)) Divide (Val (IntVal 2))) initialStore ~?= IntVal 4,
+        evaluate (Op2 (Val (IntVal 4)) Times (Val (IntVal 4))) initialStore ~?= IntVal 16,
+        evaluate (Op2 (Val (IntVal 9)) Divide (Val (IntVal 2))) initialStore ~?= IntVal 4,
+        evaluate (Op2 (Val (IntVal 10)) Modulo (Val (IntVal 4))) initialStore ~?= IntVal 2,
+        evaluate (Op2 (Val (IntVal 10)) Plus (Val (StringVal "hello"))) initialStore ~?= NilVal,
+        evaluate (Op2 (Val (IntVal 4)) Eq (Val (IntVal 4))) initialStore ~?= BoolVal True,
+        evaluate (Op2 (Val (IntVal 2)) Gt (Val (IntVal 6))) initialStore ~?= BoolVal False
+      ]
+
+
+test_evaluate_nested :: Test
+test_evaluate_nested =
+  "evaluate nested"
+    ~: TestList
+      [ evaluate (Op2 (Val (IntVal 7)) Plus (Op2 (Val (IntVal 3)) Plus (Val (IntVal 5)))) initialStore ~?= IntVal 15,
+        evaluate (Op2 (Val (IntVal 5)) Eq (Op2 (Val (IntVal 8)) Minus (Val (IntVal 3)))) initialStore ~?= BoolVal True
+      ]
+
+test_evaluate_literals :: Test
+test_evaluate_literals =
+  "evaluate literals"
+    ~: TestList
+      [ evaluate (Val (IntVal 2)) initialStore ~?= IntVal 2,
+        evaluate (Val (StringVal "hello")) initialStore ~?= StringVal "hello",
+        evaluate (Val (BoolVal True)) initialStore ~?= BoolVal True
+      ]
+
+test_evaluate_vars :: Test
+test_evaluate_vars =
+  "evaluate vars"
+    ~: TestList
+      [ evaluate (Var "x") initialStore ~?= NilVal,
+        evaluate (Var  "x") extendedStore ~?= IntVal 3,
+        evaluate (Var  "x") extendedStore2 ~?= IntVal 3
+      ]
+
+evaluateTests = TestList [test_evaluate_nested, test_evaluate_literals, test_evaluate_vars, test_evaluate_binops, test_evaluate_unops]
+
+
+-- >>> runTestTT evaluateTests
+-- Counts {cases = 21, tried = 21, errors = 0, failures = 0}
