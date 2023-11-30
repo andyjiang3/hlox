@@ -20,7 +20,7 @@ type Environment = Map Name Table
 
 type Table = Map Value Value
 
-data Store = St {environment :: Environment, parent :: Maybe Environment} deriving (Eq, Show)
+data Store = St {environment :: Environment, parent :: Maybe Store} deriving (Eq, Show)
 
 globalTableName  :: Name
 globalTableName = "_G"
@@ -46,6 +46,23 @@ extendedStore =
         parent = Nothing
         }
 
+extendedStore2 :: Store
+extendedStore2 =
+  St
+    { environment =
+        Map.fromList
+          [ ( globalTableName,
+              Map.fromList
+                [(StringVal "z", IntVal 3)]
+            ),
+            ( "_t1",
+              Map.fromList
+                [ (StringVal "w", BoolVal True)
+                ]
+            )
+          ],
+      parent = Just extendedStore
+    }
 
 type Reference = (Name, Value)
 
@@ -59,7 +76,10 @@ index :: Reference -> State Store Value
 index (t, n) = do
   store <- S.get
   let valMaybe = let env = environment store in env !? t >>= (!? n)
-  return $ fromMaybe NilVal valMaybe
+  let u :: Value = case parent store of 
+        Nothing -> NilVal
+        Just st -> let b = index (t,n) in S.evalState b st
+  return $ fromMaybe u valMaybe
 
 
 update :: Reference -> Value -> State Store ()
@@ -89,9 +109,11 @@ test_index =
         -- We should also be able to access "t[1]" in the extended store
         S.evalState (index yref) extendedStore ~?= BoolVal True,
         -- Updates using the `nil` key are ignored
-        let u = S.execState (update ("_t1", NilVal) (IntVal 3)) extendedStore in u ~?= extendedStore
+        S.execState (update ("_t1", NilVal) (IntVal 3)) extendedStore ~?= extendedStore,
+
+        S.evalState (index yref) extendedStore2 ~?= BoolVal True
       ]
 
 -- >>> runTestTT test_index
--- Counts {cases = 5, tried = 5, errors = 0, failures = 0}
+-- Counts {cases = 6, tried = 6, errors = 0, failures = 0}
 
