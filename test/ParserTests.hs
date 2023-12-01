@@ -4,6 +4,7 @@ import Control.Applicative
 import Data.Char qualified as Char
 import LoxParser
 import LoxSyntax
+import ParserLib (Parser)
 import ParserLib qualified as P
 import Test.HUnit (Assertion, Counts, Test (..), assert, runTestTT, (~:), (~?=))
 import Test.QuickCheck qualified as QC
@@ -33,14 +34,14 @@ test_constP =
       P.parse (many (constP "&" 'a')) "&   &" ~?= Right "aa"
     ]
 
--- test_stringValP :: Test
--- test_stringValP =
---   TestList
---     [ P.parse stringValP "\"a\"" ~?= Right (StringVal "a"),
---       P.parse stringValP "\"a\\\"\"" ~?= Right (StringVal "a\\"),
---       P.parse (many stringValP) "\"a\"   \"b\"" ~?= Right [StringVal "a", StringVal "b"],
---       P.parse (many stringValP) "\" a\"   \"b\"" ~?= Right [StringVal " a", StringVal "b"]
---     ]
+test_stringValP :: Test
+test_stringValP =
+  TestList
+    [ P.parse stringValP "\"a\"" ~?= Right (StringVal "a"),
+      P.parse stringValP "\"a\\\"\"" ~?= Right (StringVal "a\\"),
+      P.parse (many stringValP) "\"a\"   \"b\"" ~?= Right [StringVal "a", StringVal "b"],
+      P.parse (many stringValP) "\" a\"   \"b\"" ~?= Right [StringVal " a", StringVal "b"]
+    ]
 
 -- pretty :: (BP.PP a) => a -> String
 -- pretty = PP.render . BP.pp
