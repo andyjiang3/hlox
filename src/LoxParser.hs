@@ -69,26 +69,12 @@ expP = orP
 opAtLevel :: Int -> Parser (Expression -> Expression -> Expression)
 opAtLevel l = flip Op2 <$> P.filter (\x -> level x == l) bopP
 
--- >>>  P.parse (many varP) "x y z"
--- Right ["x","y","z"]
--- >>> P.parse varP "(x.y[1]).z"
--- Left "No parses"
 varP :: Parser Name
 varP = wsP $ P.filter (`notElem` LoxSyntax.reserved) ((:) <$> (P.alpha <|> P.char '_') <*> many (P.alpha <|> P.digit <|> P.char '_'))
 
--- >>> P.parse (many uopP) "- - !"
--- Right [Neg,Neg,Not]
-
--- >>> P.parse (many uopP) "! - test hi"
--- Right [Not,Neg]
 uopP :: Parser Uop
 uopP = constP "-" Neg <|> constP "!" Not
 
--- >>> P.parse (many bopP) "+ >= test"
--- Right [Plus,Gt]
-
--- >>> P.parse (many bopP) "+ - * / % or and == != > >= < <= .."
--- Right [Plus,Minus,Times,Divide,Modulo,Or,And,Eq,Ne,Gt,Gt]
 bopP :: Parser Bop
 bopP =
   constP "+" Plus
@@ -100,10 +86,10 @@ bopP =
     <|> constP "and" And
     <|> constP "==" Eq
     <|> constP "!=" Ne
-    <|> constP ">" Gt
     <|> constP ">=" Ge
-    <|> constP "<" Lt
+    <|> constP ">" Gt
     <|> constP "<=" Le
+    <|> constP "<" Lt
 
 funcCallExpP :: Parser Expression -> Parser Expression
 funcCallExpP p = process <$> first <*> rest
@@ -122,13 +108,6 @@ funcCallExpP p = process <$> first <*> rest
 
 funcArgsExpP :: Parser [Expression]
 funcArgsExpP = parens $ P.sepBy expP (wsP $ stringP ",") -- TODO: should I trim both sides or is right side enough
-
--- -- >>> P.parse tableConstP "{ x = 2, [3] = false }"
--- -- Right (TableConst [FieldName "x" (Val (IntVal 2)),FieldKey (Val (IntVal 3)) (Val (BoolVal False))])
--- tableConstP :: Parser Expression
--- tableConstP = TableConst <$> braces (P.sepBy fieldP (stringP ","))
---   where
---     fieldP = FieldName <$> nameP <*> (stringP "=" *> expP) <|> FieldKey <$> brackets expP <*> (stringP "=" *> expP)
 
 -- Statement parser --
 statementP :: Parser Statement
@@ -166,6 +145,7 @@ whileP = While <$> (stringP "while" *> parens expP) <*> braces blockP
 forP :: Parser Statement
 forP = For <$> (stringP "for" *> stringP "(" *> varDecP) <*> (stringP ";" *> expP) <*> (stringP ";" *> expP) <*> (stringP ")" *> braces blockP)
 
+-- f(e1, ..., en)
 funcCallStatP :: Parser Statement
 funcCallStatP = convertToStat <$> funcCallExpP expP
   where
@@ -175,7 +155,7 @@ funcCallStatP = convertToStat <$> funcCallExpP expP
 
 -- fun f(x1, ..., xn) { s }
 funcDefP :: Parser Statement
-funcDefP = FunctionDef <$> (stringP "fun" *> varP) <*> parens (P.sepBy varP (stringP ",")) <*> braces blockP
+funcDefP = FunctionDef <$> (stringP "fun" *> expP) <*> parens (P.sepBy varP (stringP ",")) <*> braces blockP
 
 -- return e
 returnP :: Parser Statement
@@ -220,48 +200,50 @@ parseLuFile = P.parseFromFile (const <$> blockP <*> P.eof)
 --         (Left _) -> assert False
 --         (Right ast') -> assert (ast == ast')
 
--- test_comb =
---   "parsing combinators"
---     ~: TestList
---       [ P.parse (wsP P.alpha) "a" ~?= Right 'a',
---         P.parse (many (wsP P.alpha)) "a b \n   \t c" ~?= Right "abc",
---         P.parse (stringP "a") "a" ~?= Right (),
---         P.parse (stringP "a") "b" ~?= Left "No parses",
---         P.parse (many (stringP "a")) "a  a" ~?= Right [(), ()],
---         P.parse (constP "&" 'a') "&  " ~?= Right 'a',
---         P.parse (many (constP "&" 'a')) "&   &" ~?= Right "aa",
---         P.parse (many (brackets (constP "1" 1))) "[1] [  1]   [1 ]" ~?= Right [1, 1, 1]
---       ]
+test_comb =
+  "parsing combinators"
+    ~: TestList
+      [ P.parse (wsP P.alpha) "a" ~?= Right 'a',
+        P.parse (many (wsP P.alpha)) "a b \n   \t c" ~?= Right "abc",
+        P.parse (stringP "a") "a" ~?= Right (),
+        P.parse (stringP "a") "b" ~?= Left "No parses",
+        P.parse (many (stringP "a")) "a  a" ~?= Right [(), ()],
+        P.parse (constP "&" 'a') "&  " ~?= Right 'a',
+        P.parse (many (constP "&" 'a')) "&   &" ~?= Right "aa",
+        P.parse (many (brackets (constP "1" 1))) "[1] [  1]   [1 ]" ~?= Right [1, 1, 1]
+      ]
 
--- test_value =
---   "parsing values"
---     ~: TestList
---       [ P.parse (many intValP) "1 2\n 3" ~?= Right [IntVal 1, IntVal 2, IntVal 3],
---         P.parse (many boolValP) "true false\n true" ~?= Right [BoolVal True, BoolVal False, BoolVal True],
---         P.parse (many nilValP) "nil nil\n nil" ~?= Right [NilVal, NilVal, NilVal],
---         P.parse stringValP "\"a\"" ~?= Right (StringVal "a"),
---         P.parse stringValP "\"a\\\"\"" ~?= Right (StringVal "a\\"),
---         P.parse (many stringValP) "\"a\"   \"b\"" ~?= Right [StringVal "a", StringVal "b"],
---         P.parse (many stringValP) "\" a\"   \"b\"" ~?= Right [StringVal " a", StringVal "b"]
---       ]
+test_value =
+  "parsing values"
+    ~: TestList
+      [ P.parse (many intValP) "1 2\n 3" ~?= Right [IntVal 1, IntVal 2, IntVal 3],
+        P.parse (many boolValP) "true false\n true" ~?= Right [BoolVal True, BoolVal False, BoolVal True],
+        P.parse (many nilValP) "nil nil\n nil" ~?= Right [NilVal, NilVal, NilVal],
+        P.parse stringValP "\"a\"" ~?= Right (StringVal "a"),
+        P.parse stringValP "\"a\\\"\"" ~?= Right (StringVal "a\\"),
+        P.parse (many stringValP) "\"a\"   \"b\"" ~?= Right [StringVal "a", StringVal "b"],
+        P.parse (many stringValP) "\" a\"   \"b\"" ~?= Right [StringVal " a", StringVal "b"]
+      ]
 
--- test_exp =
---   "parsing expressions"
---     ~: TestList
---       [ P.parse (many varP) "x y z" ~?= Right [Name "x", Name "y", Name "z"],
---         P.parse varP "(x.y[1]).z" ~?= Right (Dot (Var (Proj (Var (Dot (Var (Name "x")) "y")) (Val (IntVal 1)))) "z"),
---         P.parse (many nameP) "x sfds _ nil" ~?= Right ["x", "sfds", "_"],
---         P.parse (many uopP) "- - #" ~?= Right [Neg, Neg, Len],
---         P.parse (many bopP) "+ >= .." ~?= Right [Plus, Ge, Concat],
---         P.parse tableConstP "{ x = 2, [3] = false }"
---           ~?= Right (TableConst [FieldName "x" (Val (IntVal 2)), FieldKey (Val (IntVal 3)) (Val (BoolVal False))])
---       ]
+test_exp =
+  "parsing expressions"
+    ~: TestList
+      [ P.parse (many varP) "x y z" ~?= Right ["x", "y", "z"],
+        P.parse varP "(x.y[1]).z" ~?= Left "No parses",
+        P.parse (many varP) "x sfds _ nil" ~?= Right ["x", "sfds", "_"],
+        P.parse (many uopP) "- - !" ~?= Right [Neg, Neg, Not],
+        P.parse (many uopP) "! - test hi" ~?= Right [Not, Neg],
+        P.parse (many bopP) "+ >= test" ~?= Right [Plus, Ge],
+        P.parse (many bopP) "+ - * / % or and == != > >= < <=" ~?= Right [Plus, Minus, Times, Divide, Modulo, Or, And, Eq, Ne, Gt, Ge, Lt, Le],
+        P.parse (funcCallExpP expP) "f(a1)" ~?= Right (FunctionCall (Var "f") [Var "a1"])
+      ]
 
 -- test_stat =
 --   "parsing statements"
 --     ~: TestList
 --       [ P.parse statementP ";" ~?= Right Empty,
---         P.parse statementP "x=3" ~?= Right (Assign (Name "x") (Val (IntVal 3))),
+--         P.parse statementP "var x=3" ~?= Right (Assign (LName "x") (Val (IntVal 3))),
+--         P.parse statementP "var x=3" ~?= Right (Assign (LName "x") (Val (IntVal 3))),
 --         P.parse statementP "if x then y=nil else end"
 --           ~?= Right (If (Var (Name "x")) (Block [Assign (Name "y") (Val NilVal)]) (Block [])),
 --         P.parse statementP "while nil do end"
