@@ -28,7 +28,7 @@ data Statement
   | While Expression Block -- while (e) { s }
   | For Statement Expression Statement Block -- for (var x = e; e; e) { s }
   | FunctionCallStatement Expression [Expression] -- f(e1, ..., en), TODO: Name instead of expresssion?
-  | FunctionDef Expression [Name] Block -- fun f(x1, ..., xn) { s }
+  | FunctionDef Name [Name] Block -- fun f(x1, ..., xn) { s }
   | Return Expression -- return e
   | Print Expression -- print e
   | Empty -- ';'
@@ -54,7 +54,7 @@ data Value -- literals
   | IntVal Int -- 1
   | BoolVal Bool -- false, true
   | StringVal String -- "abd"
-  | FunctionVal Expression [Name] Block -- fun f(x1, ..., xn) { s }
+  | FunctionVal [Name] Block -- (x1, ..., xn) { s }
   deriving
     ( Eq,
       Show,

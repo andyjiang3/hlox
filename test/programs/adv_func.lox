@@ -1,0 +1,9 @@
+var x = 1
+var y = 2
+
+fun t(z) {
+	x = x + 1
+	return z
+}
+
+var z = t(y)

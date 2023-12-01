@@ -55,7 +55,7 @@ expP = orP
     equalityP = compP `P.chainl1` opAtLevel (level Eq)
     compP = sumP `P.chainl1` opAtLevel (level Lt)
     sumP = timesP `P.chainl1` opAtLevel (level Plus)
-    timesP = uopexpP `P.chainl1` opAtLevel (level Times)
+    timesP = funcCallP `P.chainl1` opAtLevel (level Times)
     funcCallP = funcCallExpP uopexpP -- TODO: support array index
     uopexpP =
       baseP
@@ -107,7 +107,7 @@ funcCallExpP p = process <$> first <*> rest
     rest = many funcArgsExpP
 
 funcArgsExpP :: Parser [Expression]
-funcArgsExpP = parens $ P.sepBy expP (wsP $ stringP ",") -- TODO: should I trim both sides or is right side enough
+funcArgsExpP = wsP (parens $ P.sepBy expP (wsP $ stringP ",")) -- TODO: should I trim both sides or is right side enough
 
 -- Statement parser --
 statementP :: Parser Statement
@@ -155,7 +155,7 @@ funcCallStatP = convertToStat <$> funcCallExpP expP
 
 -- fun f(x1, ..., xn) { s }
 funcDefP :: Parser Statement
-funcDefP = FunctionDef <$> (stringP "fun" *> expP) <*> parens (P.sepBy varP (stringP ",")) <*> braces blockP
+funcDefP = FunctionDef <$> (stringP "fun" *> varP) <*> parens (P.sepBy varP (stringP ",")) <*> braces blockP
 
 -- return e
 returnP :: Parser Statement
@@ -173,14 +173,14 @@ emptyP = constP ";" Empty
 blockP :: Parser Block
 blockP = wsP $ Block <$> many statementP
 
-parseLuExp :: String -> Either P.ParseError Expression
-parseLuExp = P.parse expP
+parseLoxExp :: String -> Either P.ParseError Expression
+parseLoxExp = P.parse expP
 
-parseLuStat :: String -> Either P.ParseError Statement
-parseLuStat = P.parse statementP
+parseLoxStat :: String -> Either P.ParseError Statement
+parseLoxStat = P.parse statementP
 
-parseLuFile :: String -> IO (Either P.ParseError Block)
-parseLuFile = P.parseFromFile (const <$> blockP <*> P.eof)
+parseLoxFile :: String -> IO (Either P.ParseError Block)
+parseLoxFile = P.parseFromFile (const <$> blockP <*> P.eof)
 
 tParseFiles :: Test
 tParseFiles =
@@ -189,11 +189,12 @@ tParseFiles =
       [ "hello world" ~: p "test/programs/hello_world.lox" loxTest,
         "abs" ~: p "test/programs/abs.lox" loxAbs,
         "exp" ~: p "test/programs/exp.lox" loxExp,
-        "basic func" ~: p "test/programs/basic_func.lox" loxBasicFunc
+        "basic func" ~: p "test/programs/basic_func.lox" loxBasicFunc,
+        "adv func" ~: p "test/programs/adv_func.lox" loxAdvFunc
       ]
   where
     p fn ast = do
-      result <- parseLuFile fn
+      result <- parseLoxFile fn
       case result of
         (Left _) -> assert False
         (Right ast') -> assert (ast == ast')
@@ -235,8 +236,18 @@ loxBasicFunc =
   Block
     [ VarDecl "x" (Val (IntVal 1)),
       VarDecl "y" (Val (IntVal 2)),
-      FunctionDef (Var "t") ["z"] (Block [Assign (LName "x") (Op2 (Var "x") Plus (Val (IntVal 1))), Return (Var "z")]),
+      FunctionDef "t" ["z"] (Block [Assign (LName "x") (Op2 (Var "x") Plus (Val (IntVal 1))), Return (Var "z")]),
       FunctionCallStatement (Var "t") [Var "y"]
+    ]
+
+-- adv_func.lox
+loxAdvFunc :: Block
+loxAdvFunc =
+  Block
+    [ VarDecl "x" (Val (IntVal 1)),
+      VarDecl "y" (Val (IntVal 2)),
+      FunctionDef "t" ["z"] (Block [Assign (LName "x") (Op2 (Var "x") Plus (Val (IntVal 1))), Return (Var "z")]),
+      VarDecl "z" (FunctionCall (Var "t") [Var "y"])
     ]
 
 test_comb =
@@ -288,7 +299,7 @@ test_stat =
         P.parse statementP "for (var x=3; x<6; x=x+1) { y=4 }" ~?= Right (For (VarDecl "x" (Val (IntVal 3))) (Op2 (Var "x") Lt (Val (IntVal 6))) (Assign (LName "x") (Op2 (Var "x") Plus (Val (IntVal 1)))) (Block [Assign (LName "y") (Val (IntVal 4))])),
         P.parse statementP "while (x) { y=4 }" ~?= Right (While (Var "x") (Block [Assign (LName "y") (Val (IntVal 4))])),
         P.parse statementP "f(a1)" ~?= Right (FunctionCallStatement (Var "f") [Var "a1"]),
-        P.parse statementP "fun f(x1, x2) { y=4 }" ~?= Right (FunctionDef (Var "f") ["x1", "x2"] (Block [Assign (LName "y") (Val (IntVal 4))])),
+        P.parse statementP "fun f(x1, x2) { y=4 }" ~?= Right (FunctionDef "f" ["x1", "x2"] (Block [Assign (LName "y") (Val (IntVal 4))])),
         P.parse statementP "return 4" ~?= Right (Return (Val (IntVal 4))),
         P.parse statementP "print 4" ~?= Right (Print (Val (IntVal 4)))
       ]
