@@ -149,31 +149,6 @@ update ref@(t, n) val = do
                 let st2 = St {environment = environment store, parent = Just newParent} in
                     S.put st2
 
--- updateNoInsert :: Reference -> Value -> State Store ()
--- updateNoInsert (_, NilVal) _ = return ()
--- updateNoInsert (table, name) val = do
---   store <- S.get
---   let newStore :: Maybe Store =
---         do
---           oldEnv <- environment store !? table
---           let newTable =
---                 if val == NilVal
---                   then Map.delete name oldEnv
---                   else Map.insert name val oldEnv
---           return $ store {environment = Map.insert table newTable (environment store)}
---   S.put $ fromMaybe store newStore
-
--- update :: Reference -> Value -> State Store ()
--- update (_, NilVal) _ = return ()
--- update (table, name) val = do
---   store <- S.get
---   let newStore :: Maybe Store =
---         do
---           oldEnv <- environment store !? table
---           let newTable = Map.insert name val oldEnv
---           return $ store {environment = Map.insert table newTable (environment store)}
---   S.put $ fromMaybe store newStore
-
 
 allocate :: Reference -> Value -> State Store ()
 allocate (_, NilVal) _ = return ()
@@ -188,27 +163,6 @@ allocate (table, name) val = do
   S.put $ fromMaybe store newStore
 
 
-
--- update :: Reference -> Value -> State Store ()
--- update (_, NilVal) _ = return ()
--- update ref@(table, name) val = do
---   store <- S.get
---   let updateInEnv :: Environment -> Maybe Environment
---       updateInEnv env = do
---         oldEnv <- env !? table
---         let newTable = Map.update (\_ -> Just val)  name oldEnv
---         return $ Map.insert table newTable env
-
---   let updateRecursively :: Maybe Store -> Maybe Store
---       updateRecursively Nothing = Nothing
---       updateRecursively (Just st) =
---         case updateInEnv (environment st) of
---           Just newEnv -> Just $ st {environment = newEnv}
---           Nothing -> do
---             updatedParent <- updateRecursively (parent st)
---             return $ st {parent = Just updatedParent}
-
---   S.put $ fromMaybe store (updateRecursively (Just store))
 
 test_index :: Test
 test_index =
@@ -230,10 +184,13 @@ test_index =
 
 
 
+intSt :: Store
 intSt =
   St {environment = Map.fromList [("_G", Map.fromList [(StringVal "u", IntVal 1), (StringVal "z", IntVal 3)])], parent = Just (St {environment = Map.fromList [("_G", Map.fromList [(StringVal "t", FunctionVal ["z"] (Block [Assign (LName "x") (Op2 (Var "x") Plus (Val (IntVal 4))), Assign (LName "z") (Op2 (Var "z") Plus (Val (IntVal 1))), Return (Var "x")])), (StringVal "x", IntVal 12), (StringVal "y", IntVal 2)])], parent = Nothing})}
+op :: Statement
 op = Assign (LName "x") (Op2 (Var "x") Plus (Val (IntVal 4)))
 
+tref :: (String, Value)
 tref = ("_G", StringVal "x")
 
 test_update :: Test
@@ -254,7 +211,7 @@ test_update =
 
         S.evalState (update wref (IntVal 30) >> index wref) extendedStore2 ~?= NilVal,
 
-        --S.evalState (evalS op >> index tref) intSt ~?= IntVal 5,
+        S.evalState (evalS op >> index tref) intSt ~?= IntVal 16,
 
         S.evalState (update tref (IntVal 30) >> index tref) intSt ~?= IntVal 30
 
@@ -424,17 +381,6 @@ evaluateTests = TestList [test_evaluate_nested, test_evaluate_literals, test_eva
 
 
 
-eval :: Block -> State Store (Maybe Value)
-eval (Block ss) = go ss where
-    go [] = do return Nothing
-    go [s] =  evalS s
-    go (s:ss) = do 
-        evalS s 
-        go ss
-
-
-
-
 evalS :: Statement -> State Store (Maybe Value)
 evalS (Assign lv e) = do 
     val <- evalE e
@@ -458,10 +404,25 @@ evalS (FunctionDef name names blk) = do
   return Nothing
 evalS _ = undefined
 
+
+-- evaluate a block to completion
+-- add support for early exit if there is a return
+eval :: Block -> State Store (Maybe Value)
+eval (Block ss) = go ss
+  where
+    go [] = do return Nothing
+    go [s] = evalS s
+    go (s : ss) = do
+      evalS s
+      go ss
+
+-- execute a block on a store
 exec :: Block -> Store -> Store
 exec = S.execState . eval
 
 
+-- step over a block on statement at a time
+-- add support for early exit if there is a return
 step :: Block -> State Store Block
 step b@(Block []) = return b
 step (Block (If e (Block b1) (Block b2) : ss)) = do
@@ -486,17 +447,23 @@ step (Block (s : ss)) = do
 
 
 
-
+-- step opver a block for a number of statements
 boundedStep :: Int -> Block -> State Store Block
 boundedStep i b | i > 0 = do
   b' <- step b
   boundedStep (i - 1) b'
 boundedStep _ b = return b
 
+-- exectute bounder step over a store
 steps :: Int -> Block -> Store -> (Block, Store)
 steps n block = S.runState (boundedStep n block)
 
 
+prop_step_total :: Block -> Store -> Bool
+prop_step_total b s = case S.runState (step b) s of
+  (b', s') -> True
+
+-- test to see if a block has finished
 final :: Block -> Bool
 final (Block []) = True
 final _ = False
@@ -507,17 +474,16 @@ execStep b | final b = id
 execStep b = uncurry execStep . steps 1 b
 
 
-bl :: Block
-bl =
-  Block
-    [ VarDecl "x" (Val (IntVal 1)),
-      VarDecl "y" (Val (IntVal 2)),
-      FunctionDef "t" ["z"] (Block [Assign (LName "x") (Op2 (Var "x") Plus (Val (IntVal 1))), Return (Var "z")]),
-      VarDecl "z" (FunctionCall (Var "t") [Var "y"])
-    ]
+prop_stepExec :: Block -> QC.Property
+prop_stepExec b =
+  not (final b) QC.==> final b1 QC.==> m1 == m2
+  where
+    (b1, m1) = S.runState (boundedStep 100 b) initialStore
+    m2 = exec b initialStore
 
-expectedStore :: Store
-expectedStore = St
+
+expectedStoreFunc :: Store
+expectedStoreFunc = St
         {
         environment = Map.fromList
             [ ( globalTableName,
@@ -528,14 +494,48 @@ expectedStore = St
         parent = Nothing
         }
 
-tExecStepTest :: Test
-tExecStepTest =
-  "execStep wTest"
-    ~: execStep bl initialStore
-    ~?= expectedStore
 
--- >>> runTestTT tExecStepTest
--- Counts {cases = 1, tried = 1, errors = 0, failures = 1}
+expectedLoxExp :: Store
+expectedLoxExp =
+  St {
+        environment = Map.fromList [ ("_G", Map.fromList [ 
+            (StringVal "x1", IntVal 4),
+             (StringVal "x2", NilVal),
+              (StringVal "x3", NilVal),
+              (StringVal "x4", NilVal), 
+              (StringVal "x5", BoolVal True),
+               (StringVal "x6", BoolVal False), 
+               (StringVal "x7", BoolVal False)
+               ])],
+        parent = Nothing
+    }
+
+expectedStoreAbs :: Store
+expectedStoreAbs = St {environment = Map.fromList [("_G", Map.fromList [(StringVal "x", IntVal 3)])], parent = Nothing}
+
+tExecStepFunc :: Test
+tExecStepFunc =
+  "execStep function"
+    ~: execStep loxAdvFunc initialStore
+    ~?= expectedStoreFunc
+
+tExecStepExp :: Test
+tExecStepExp =
+  "execStep exp"
+    ~: execStep loxExp initialStore
+    ~?= expectedLoxExp
+
+tExecStepAbs :: Test
+tExecStepAbs =
+  "execStep exp"
+    ~: execStep loxAbs initialStore
+    ~?= expectedStoreAbs
+
+test_execStep :: Test
+test_execStep = TestList [tExecStepFunc, tExecStepAbs, tExecStepExp]
+
+-- >>> runTestTT test_execStep
+-- Counts {cases = 3, tried = 3, errors = 0, failures = 0}
 
 
 
