@@ -111,7 +111,7 @@ funcArgsExpP = parens $ P.sepBy expP (wsP $ stringP ",") -- TODO: should I trim 
 
 -- Statement parser --
 statementP :: Parser Statement
-statementP = assignP <|> ifP <|> whileP <|> forP <|> funcCallStatP <|> funcDefP <|> returnP <|> printP <|> emptyP
+statementP = assignP <|> varDecP <|> ifP <|> whileP <|> forP <|> funcCallStatP <|> funcDefP <|> returnP <|> printP <|> emptyP
 
 varLValueP :: Parser LValue
 varLValueP = process <$> first <*> rest
@@ -131,7 +131,7 @@ varLValueP = process <$> first <*> rest
 assignP :: Parser Statement
 assignP = Assign <$> varLValueP <*> (stringP "=" *> expP)
 
-varDecP = VarDecl <$> varP <*> (stringP "=" *> expP)
+varDecP = VarDecl <$> (stringP "var" *> varP) <*> (stringP "=" *> expP)
 
 -- if (e) { s1 } else { s2 }
 ifP :: Parser Statement
@@ -143,7 +143,7 @@ whileP = While <$> (stringP "while" *> parens expP) <*> braces blockP
 
 -- for (var x = e; e; e) { s }
 forP :: Parser Statement
-forP = For <$> (stringP "for" *> stringP "(" *> varDecP) <*> (stringP ";" *> expP) <*> (stringP ";" *> expP) <*> (stringP ")" *> braces blockP)
+forP = For <$> (stringP "for" *> stringP "(" *> varDecP) <*> (stringP ";" *> expP) <*> (stringP ";" *> statementP) <*> (stringP ")" *> braces blockP)
 
 -- f(e1, ..., en)
 funcCallStatP :: Parser Statement
@@ -151,7 +151,7 @@ funcCallStatP = convertToStat <$> funcCallExpP expP
   where
     convertToStat :: Expression -> Statement
     convertToStat (FunctionCall e es) = FunctionCallStatement e es
-    convertToStat _ = error "Bug: convertToStatement should only be called on FunctionCall"
+    convertToStat _ = error "Err: convertToStatement should only be called on FunctionCall"
 
 -- fun f(x1, ..., xn) { s }
 funcDefP :: Parser Statement
@@ -244,8 +244,9 @@ test_stat =
     ~: TestList
       [ P.parse statementP ";" ~?= Right Empty,
         P.parse statementP "y=4" ~?= Right (Assign (LName "y") (Val (IntVal 4))),
-        P.parse statementP "val x=3" ~?= Right (Assign (LName "x") (Val (IntVal 3))),
+        P.parse statementP "var x=3" ~?= Right (VarDecl "x" (Val (IntVal 3))), -- TODO: val x=3 weird error
         P.parse statementP "if (x) { y=4 } else { y=5 }" ~?= Right (If (Var "x") (Block [Assign (LName "y") (Val (IntVal 4))]) (Block [Assign (LName "y") (Val (IntVal 5))])),
+        P.parse statementP "for (var x=3; x<6; x=x+1) { y=4 }" ~?= Right (For (VarDecl "x" (Val (IntVal 3))) (Op2 (Var "x") Lt (Val (IntVal 6))) (Assign (LName "x") (Op2 (Var "x") Plus (Val (IntVal 1)))) (Block [Assign (LName "y") (Val (IntVal 4))])),
         P.parse statementP "while (x) { y=4 }" ~?= Right (While (Var "x") (Block [Assign (LName "y") (Val (IntVal 4))])),
         P.parse statementP "f(a1)" ~?= Right (FunctionCallStatement (Var "f") [Var "a1"]),
         P.parse statementP "fun f(x1, x2) { y=4 }" ~?= Right (FunctionDef (Var "f") ["x1", "x2"] (Block [Assign (LName "y") (Val (IntVal 4))])),
@@ -253,14 +254,11 @@ test_stat =
         P.parse statementP "print 4" ~?= Right (Print (Val (IntVal 4)))
       ]
 
--- -- >>> runTestTT test_stat
--- -- Counts {cases = 5, tried = 5, errors = 0, failures = 0}
+test_all :: IO Counts
+test_all = runTestTT $ TestList [test_comb, test_value, test_exp, test_stat]
 
--- test_all :: IO Counts
--- test_all = runTestTT $ TestList [test_comb, test_value, test_exp, test_stat, tParseFiles]
-
--- -- >>> test_all
--- -- Counts {cases = 32, tried = 32, errors = 0, failures = 0}
+-- >>> test_all
+-- Counts {cases = 34, tried = 34, errors = 0, failures = 0}
 
 -- qc :: IO ()
 -- qc = do
