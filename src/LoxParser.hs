@@ -235,22 +235,23 @@ test_exp =
         P.parse (many uopP) "! - test hi" ~?= Right [Not, Neg],
         P.parse (many bopP) "+ >= test" ~?= Right [Plus, Ge],
         P.parse (many bopP) "+ - * / % or and == != > >= < <=" ~?= Right [Plus, Minus, Times, Divide, Modulo, Or, And, Eq, Ne, Gt, Ge, Lt, Le],
-        P.parse (funcCallExpP expP) "f(a1)" ~?= Right (FunctionCall (Var "f") [Var "a1"])
+        P.parse (funcCallExpP expP) "f(a1)" ~?= Right (FunctionCall (Var "f") [Var "a1"]),
+        P.parse (funcCallExpP expP) "f(a1, a2)" ~?= Right (FunctionCall (Var "f") [Var "a1", Var "a2"])
       ]
 
--- test_stat =
---   "parsing statements"
---     ~: TestList
---       [ P.parse statementP ";" ~?= Right Empty,
---         P.parse statementP "var x=3" ~?= Right (Assign (LName "x") (Val (IntVal 3))),
---         P.parse statementP "var x=3" ~?= Right (Assign (LName "x") (Val (IntVal 3))),
---         P.parse statementP "if x then y=nil else end"
---           ~?= Right (If (Var (Name "x")) (Block [Assign (Name "y") (Val NilVal)]) (Block [])),
---         P.parse statementP "while nil do end"
---           ~?= Right (While (Val NilVal) (Block [])),
---         P.parse statementP "repeat ; ; until false"
---           ~?= Right (Repeat (Block [Empty, Empty]) (Val (BoolVal False)))
---       ]
+test_stat =
+  "parsing statements"
+    ~: TestList
+      [ P.parse statementP ";" ~?= Right Empty,
+        P.parse statementP "y=4" ~?= Right (Assign (LName "y") (Val (IntVal 4))),
+        P.parse statementP "val x=3" ~?= Right (Assign (LName "x") (Val (IntVal 3))),
+        P.parse statementP "if (x) { y=4 } else { y=5 }" ~?= Right (If (Var "x") (Block [Assign (LName "y") (Val (IntVal 4))]) (Block [Assign (LName "y") (Val (IntVal 5))])),
+        P.parse statementP "while (x) { y=4 }" ~?= Right (While (Var "x") (Block [Assign (LName "y") (Val (IntVal 4))])),
+        P.parse statementP "f(a1)" ~?= Right (FunctionCallStatement (Var "f") [Var "a1"]),
+        P.parse statementP "fun f(x1, x2) { y=4 }" ~?= Right (FunctionDef (Var "f") ["x1", "x2"] (Block [Assign (LName "y") (Val (IntVal 4))])),
+        P.parse statementP "return 4" ~?= Right (Return (Val (IntVal 4))),
+        P.parse statementP "print 4" ~?= Right (Print (Val (IntVal 4)))
+      ]
 
 -- -- >>> runTestTT test_stat
 -- -- Counts {cases = 5, tried = 5, errors = 0, failures = 0}

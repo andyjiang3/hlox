@@ -10,7 +10,7 @@ import Test.QuickCheck qualified as QC
 import Text.PrettyPrint (Doc, (<+>))
 
 newtype Block = Block [Statement] -- s1 ... sn
-  deriving (Eq, Show)
+  deriving (Eq, Show, Ord)
 
 instance Semigroup Block where
   Block s1 <> Block s2 = Block (s1 <> s2)
@@ -32,7 +32,7 @@ data Statement
   | Return Expression -- return e
   | Print Expression -- print e
   | Empty -- ';'
-  deriving (Eq, Show)
+  deriving (Eq, Show, Ord)
 
 -- produce a value, can be assigned or used as an operand
 data Expression
@@ -42,12 +42,12 @@ data Expression
   | Op2 Expression Bop Expression -- binary operators
   | -- TODO: Support array, a[i] and [e1, ..., en]
     FunctionCall Expression [Expression] -- f(e1, ..., en)
-  deriving (Eq, Show)
+  deriving (Eq, Show, Ord)
 
 data LValue
   = LName Name -- x, global variable
   | LArrayIndex LValue Expression -- a[i], a[i][j], TODO: support
-  deriving (Eq, Show)
+  deriving (Eq, Show, Ord)
 
 data Value -- literals
   = NilVal -- nil
@@ -57,14 +57,15 @@ data Value -- literals
   | FunctionVal Expression [Name] Block -- fun f(x1, ..., xn) { s }
   deriving
     ( Eq,
-      Show
+      Show,
+      Ord
     )
 
 -- | FunctionVal [Name] Block -- function (x1, ..., xn) s end, todo: constraint name more?
 data Uop
   = Neg -- `-` :: Int -> Int
   | Not -- `!` :: a -> Bool
-  deriving (Eq, Show, Enum, Bounded)
+  deriving (Eq, Show, Enum, Bounded, Ord)
 
 data Bop
   = Plus -- `+`  :: Int -> Int -> Int
@@ -80,7 +81,7 @@ data Bop
   | Ge -- `>=` :: a -> a -> Bool
   | Lt -- `<`  :: a -> a -> Bool
   | Le -- `<=` :: a -> a -> Bool
-  deriving (Eq, Show, Enum, Bounded)
+  deriving (Eq, Show, Enum, Bounded, Ord)
 
 reserved :: [String]
 reserved =
