@@ -18,9 +18,6 @@ stringP s = wsP (P.string s) *> pure ()
 constP :: String -> a -> Parser a
 constP p x = wsP (P.string p) *> pure x
 
--- removeSpacesAround :: Parser a -> Parser a
--- removeSpacesAround p = many P.space *> p <* many P.space
-
 parens :: Parser a -> Parser a
 parens x = P.between (stringP "(") x (stringP ")")
 
