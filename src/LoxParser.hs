@@ -105,7 +105,23 @@ bopP =
     <|> constP "<" Lt
     <|> constP "<=" Le
 
-funcCallExpP = undefined
+funcCallExpP :: Parser Expression -> Parser Expression
+funcCallExpP p = process <$> first <*> rest
+  where
+    process :: Expression -> [[Expression]] -> Expression
+    process = foldl comb
+
+    comb :: Expression -> [Expression] -> Expression
+    comb = FunctionCall
+
+    first :: Parser Expression
+    first = p
+
+    rest :: Parser [[Expression]]
+    rest = many funcArgsExpP
+
+funcArgsExpP :: Parser [Expression]
+funcArgsExpP = parens $ P.sepBy expP (wsP $ stringP ",") -- TODO: should I trim both sides or is right side enough
 
 -- -- >>> P.parse tableConstP "{ x = 2, [3] = false }"
 -- -- Right (TableConst [FieldName "x" (Val (IntVal 2)),FieldKey (Val (IntVal 3)) (Val (BoolVal False))])
@@ -114,26 +130,77 @@ funcCallExpP = undefined
 --   where
 --     fieldP = FieldName <$> nameP <*> (stringP "=" *> expP) <|> FieldKey <$> brackets expP <*> (stringP "=" *> expP)
 
--- statementP :: Parser Statement
--- statementP = assignP <|> ifP <|> whileP <|> emptyP <|> repeatP
---   where
---     assignP = Assign <$> varP <*> (stringP "=" *> expP)
---     ifP = If <$> (stringP "if" *> expP) <*> (stringP "then" *> blockP) <*> (stringP "else" *> blockP <* stringP "end")
---     whileP = While <$> (stringP "while" *> expP) <*> (stringP "do" *> blockP <* stringP "end")
---     emptyP = constP ";" Empty
---     repeatP = Repeat <$> (stringP "repeat" *> blockP) <*> (stringP "until" *> expP)
+-- Statement parser --
+statementP :: Parser Statement
+statementP = assignP <|> ifP <|> whileP <|> forP <|> funcCallStatP <|> funcDefP <|> returnP <|> printP <|> emptyP
 
--- blockP :: Parser Block
--- blockP = wsP $ Block <$> many statementP
+varLValueP :: Parser LValue
+varLValueP = process <$> first <*> rest
+  where
+    process :: LValue -> [Expression] -> LValue
+    process = foldl comb
 
--- parseLuExp :: String -> Either P.ParseError Expression
--- parseLuExp = P.parse expP
+    comb :: LValue -> Expression -> LValue
+    comb = LArrayIndex
 
--- parseLuStat :: String -> Either P.ParseError Statement
--- parseLuStat = P.parse statementP
+    first :: Parser LValue
+    first = LName <$> varP
 
--- parseLuFile :: String -> IO (Either P.ParseError Block)
--- parseLuFile = P.parseFromFile (const <$> blockP <*> P.eof)
+    rest :: Parser [Expression]
+    rest = many $ brackets expP
+
+assignP :: Parser Statement
+assignP = Assign <$> varLValueP <*> (stringP "=" *> expP)
+
+varDecP = VarDecl <$> varP <*> (stringP "=" *> expP)
+
+-- if (e) { s1 } else { s2 }
+ifP :: Parser Statement
+ifP = If <$> (stringP "if" *> parens expP) <*> braces blockP <*> (stringP "else" *> braces blockP)
+
+-- while (e) { s }
+whileP :: Parser Statement
+whileP = While <$> (stringP "while" *> parens expP) <*> braces blockP
+
+-- for (var x = e; e; e) { s }
+forP :: Parser Statement
+forP = For <$> (stringP "for" *> stringP "(" *> varDecP) <*> (stringP ";" *> expP) <*> (stringP ";" *> expP) <*> (stringP ")" *> braces blockP)
+
+funcCallStatP :: Parser Statement
+funcCallStatP = convertToStat <$> funcCallExpP expP
+  where
+    convertToStat :: Expression -> Statement
+    convertToStat (FunctionCall e es) = FunctionCallStatement e es
+    convertToStat _ = error "Bug: convertToStatement should only be called on FunctionCall"
+
+-- fun f(x1, ..., xn) { s }
+funcDefP :: Parser Statement
+funcDefP = FunctionDef <$> (stringP "fun" *> varP) <*> parens (P.sepBy varP (stringP ",")) <*> braces blockP
+
+-- return e
+returnP :: Parser Statement
+returnP = Return <$> (stringP "return" *> expP)
+
+-- print e
+printP :: Parser Statement
+printP = Print <$> (stringP "print" *> expP)
+
+-- ;
+emptyP :: Parser Statement
+emptyP = constP ";" Empty
+
+-- Block parser --
+blockP :: Parser Block
+blockP = wsP $ Block <$> many statementP
+
+parseLuExp :: String -> Either P.ParseError Expression
+parseLuExp = P.parse expP
+
+parseLuStat :: String -> Either P.ParseError Statement
+parseLuStat = P.parse statementP
+
+parseLuFile :: String -> IO (Either P.ParseError Block)
+parseLuFile = P.parseFromFile (const <$> blockP <*> P.eof)
 
 -- tParseFiles :: Test
 -- tParseFiles =

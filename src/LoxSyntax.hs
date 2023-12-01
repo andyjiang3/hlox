@@ -26,7 +26,7 @@ data Statement
   | VarDecl Name Expression -- var x = e
   | If Expression Block Block -- if (e) { s1 } else { s2 }
   | While Expression Block -- while (e) { s }
-  | For Name Expression Block -- for (var x = e; e; e) { s }, TODO: make sure this is correct
+  | For Statement Expression Expression Block -- for (var x = e; e; e) { s }
   | FunctionCallStatement Expression [Expression] -- f(e1, ..., en), TODO: Name instead of expresssion?
   | FunctionDef Name [Name] Block -- fun f(x1, ..., xn) { s }
   | Return Expression -- return e
