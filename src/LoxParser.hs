@@ -135,7 +135,7 @@ varDecP = VarDecl <$> (stringP "var" *> varP) <*> (stringP "=" *> expP)
 
 -- if (e) { s1 } else { s2 }
 ifP :: Parser Statement
-ifP = If <$> (stringP "if" *> parens expP) <*> braces blockP <*> (stringP "else" *> braces blockP)
+ifP = If <$> (stringP "if" *> parens expP) <*> braces blockP <*> (stringP "else" *> braces blockP <|> pure (Block []))
 
 -- while (e) { s }
 whileP :: Parser Statement
@@ -182,23 +182,62 @@ parseLuStat = P.parse statementP
 parseLuFile :: String -> IO (Either P.ParseError Block)
 parseLuFile = P.parseFromFile (const <$> blockP <*> P.eof)
 
--- tParseFiles :: Test
--- tParseFiles =
---   "parse files"
---     ~: TestList
---       [ "fact" ~: p "lu/fact.lu" wFact,
---         "test" ~: p "lu/test.lu" wTest,
---         "abs" ~: p "lu/abs.lu" wAbs,
---         "times" ~: p "lu/times.lu" wTimes,
---         "table" ~: p "lu/table.lu" wTable,
---         "bfs" ~: p "lu/bfs.lu" wBfs
---       ]
---   where
---     p fn ast = do
---       result <- parseLuFile fn
---       case result of
---         (Left _) -> assert False
---         (Right ast') -> assert (ast == ast')
+tParseFiles :: Test
+tParseFiles =
+  "parse files"
+    ~: TestList
+      [ "hello world" ~: p "test/programs/hello_world.lox" loxTest,
+        "abs" ~: p "test/programs/abs.lox" loxAbs,
+        "exp" ~: p "test/programs/exp.lox" loxExp,
+        "basic func" ~: p "test/programs/basic_func.lox" loxBasicFunc
+      ]
+  where
+    p fn ast = do
+      result <- parseLuFile fn
+      case result of
+        (Left _) -> assert False
+        (Right ast') -> assert (ast == ast')
+
+-- hello_world.lox
+loxTest :: Block
+loxTest =
+  Block
+    [ Print (Val (StringVal "Hello, world!"))
+    ]
+
+-- abs.lox
+loxAbs :: Block
+loxAbs =
+  Block
+    [ VarDecl "x" (Op2 (Val (IntVal 0)) Minus (Val (IntVal 3))),
+      If
+        (Op2 (Var "x") Lt (Val (IntVal 0)))
+        (Block [Assign (LName "x") (Op2 (Val (IntVal 0)) Minus (Var "x"))])
+        (Block [])
+    ]
+
+-- exp.lox
+loxExp :: Block
+loxExp =
+  Block
+    [ VarDecl "x1" (Op2 (Val (IntVal 1)) Plus (Val (IntVal 3))),
+      VarDecl "x2" (Op2 (Val (IntVal 1)) Plus (Val NilVal)),
+      VarDecl "x3" (Op2 (Val (IntVal 1)) Divide (Val (IntVal 0))),
+      VarDecl "x4" (Op2 (Val (IntVal 1)) Plus (Val (StringVal "s"))),
+      VarDecl "x5" (Op2 (Val (IntVal 1)) Lt (Val (BoolVal True))),
+      VarDecl "x6" (Op1 Not (Val (IntVal 1))),
+      VarDecl "x7" (Op2 (Val NilVal) Eq (Val (BoolVal True)))
+    ]
+
+-- basic_func.lox
+loxBasicFunc :: Block
+loxBasicFunc =
+  Block
+    [ VarDecl "x" (Val (IntVal 1)),
+      VarDecl "y" (Val (IntVal 2)),
+      FunctionDef (Var "t") ["z"] (Block [Assign (LName "x") (Op2 (Var "x") Plus (Val (IntVal 1))), Return (Var "z")]),
+      FunctionCallStatement (Var "t") [Var "y"]
+    ]
 
 test_comb =
   "parsing combinators"
@@ -255,16 +294,7 @@ test_stat =
       ]
 
 test_all :: IO Counts
-test_all = runTestTT $ TestList [test_comb, test_value, test_exp, test_stat]
+test_all = runTestTT $ TestList [test_comb, test_value, test_exp, test_stat, tParseFiles]
 
 -- >>> test_all
--- Counts {cases = 34, tried = 34, errors = 0, failures = 0}
-
--- qc :: IO ()
--- qc = do
---   putStrLn "roundtrip_val"
---   QC.quickCheck prop_roundtrip_val
---   putStrLn "roundtrip_exp"
---   QC.quickCheck prop_roundtrip_exp
---   putStrLn "roundtrip_stat"
---   QC.quickCheck prop_roundtrip_stat
+-- Counts {cases = 37, tried = 37, errors = 0, failures = 0}
