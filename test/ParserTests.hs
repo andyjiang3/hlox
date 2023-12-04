@@ -40,6 +40,13 @@ test_stringValP =
       P.parse (many stringValP) "\" a\"   \"b\"" ~?= Right [StringVal " a", StringVal "b"]
     ]
 
+test_funcValP :: Test
+test_funcValP =
+  TestList
+    [ P.parse funcValP "\\(x1, x2) { y=4 }" ~?= Right (FunctionVal ["x1", "x2"] (Block [Assign (LName "y") (Val (IntVal 4))])),
+      P.parse (many funcValP) "\\(x1, x2) { y=4 } \\(x1, x2) { y=4 }" ~?= Right [FunctionVal ["x1", "x2"] (Block [Assign (LName "y") (Val (IntVal 4))]), FunctionVal ["x1", "x2"] (Block [Assign (LName "y") (Val (IntVal 4))])]
+    ]
+
 tParseFiles :: Test
 tParseFiles =
   "parse files"
@@ -101,7 +108,7 @@ test_stat =
     ~: TestList
       [ P.parse statementP ";" ~?= Right Empty,
         P.parse statementP "y=4" ~?= Right (Assign (LName "y") (Val (IntVal 4))),
-        P.parse statementP "var x=3" ~?= Right (VarDecl "x" (Val (IntVal 3))), 
+        P.parse statementP "var x=3" ~?= Right (VarDecl "x" (Val (IntVal 3))),
         P.parse statementP "if (x) { y=4 } else { y=5 }" ~?= Right (If (Var "x") (Block [Assign (LName "y") (Val (IntVal 4))]) (Block [Assign (LName "y") (Val (IntVal 5))])),
         P.parse statementP "for (var x=3; x<6; x=x+1) { y=4 }" ~?= Right (For (VarDecl "x" (Val (IntVal 3))) (Op2 (Var "x") Lt (Val (IntVal 6))) (Assign (LName "x") (Op2 (Var "x") Plus (Val (IntVal 1)))) (Block [Assign (LName "y") (Val (IntVal 4))])),
         P.parse statementP "while (x) { y=4 }" ~?= Right (While (Var "x") (Block [Assign (LName "y") (Val (IntVal 4))])),

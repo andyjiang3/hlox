@@ -1,0 +1,7 @@
+fun test(a, b) {
+	return a(b)
+}
+
+var x = test(\(y) {
+	return y + 1
+}, 1)

@@ -57,7 +57,7 @@ data Value -- literals
   | BoolVal Bool -- false, true
   | StringVal String -- "abd"
   | ArrayVal [Value] -- [v1, ..., vn]
-  | FunctionVal [Name] Block -- (x1, ..., xn) { s }
+  | FunctionVal [Name] Block -- \(x1, ..., xn) { s }, supports anonymous function
   deriving
     ( Eq,
       Show,

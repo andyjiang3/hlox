@@ -2,6 +2,7 @@ module LoxParser where
 
 import Control.Applicative
 import Data.Char qualified as Char
+import GHC.Arr (array)
 import LoxSyntax
 import ParserLib (Parser)
 import ParserLib qualified as P
@@ -43,6 +44,9 @@ nilValP = constP "nil" NilVal
 stringValP :: Parser Value
 stringValP = StringVal <$> wsP (P.between (P.string "\"") (many (P.satisfy (/= '"'))) (P.string "\""))
 
+funcValP :: Parser Value
+funcValP = FunctionVal <$> (stringP "\\" *> parens (P.sepBy varP (stringP ","))) <*> braces blockP
+
 -- Expression parser --
 expP :: Parser Expression
 expP = orP
@@ -53,7 +57,8 @@ expP = orP
     compP = sumP `P.chainl1` opAtLevel (level Lt)
     sumP = timesP `P.chainl1` opAtLevel (level Plus)
     timesP = funcCallP `P.chainl1` opAtLevel (level Times)
-    funcCallP = funcCallExpP uopexpP -- TODO: support array index
+    funcCallP = funcCallExpP arrayIndexP
+    arrayIndexP = arrayIndexExpP uopexpP
     uopexpP =
       baseP
         <|> Op1 <$> uopP <*> uopexpP
@@ -104,6 +109,21 @@ funcCallExpP p = process <$> first <*> rest
 
 funcArgsExpP :: Parser [Expression]
 funcArgsExpP = wsP (parens $ P.sepBy expP (wsP $ stringP ","))
+
+arrayIndexExpP :: Parser Expression -> Parser Expression
+arrayIndexExpP p = process <$> first <*> rest
+  where
+    process :: Expression -> [Expression] -> Expression
+    process = foldl comb
+
+    comb :: Expression -> Expression -> Expression
+    comb = ArrayIndex
+
+    first :: Parser Expression
+    first = p
+
+    rest :: Parser [Expression]
+    rest = many $ brackets expP
 
 -- Statement parser --
 statementP :: Parser Statement
