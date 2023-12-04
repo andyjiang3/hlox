@@ -40,8 +40,9 @@ data Expression
   | Val Value -- literal values
   | Op1 Uop Expression -- unary operators
   | Op2 Expression Bop Expression -- binary operators
-  | -- TODO: Support array, a[i] and [e1, ..., en]
-    FunctionCall Expression [Expression] -- f(e1, ..., en)
+  | ArrayIndex Expression Expression -- a[i]
+  | ArrayCons [Expression] -- [e1, ..., en]
+  | FunctionCall Expression [Expression] -- f(e1, ..., en)
   deriving (Eq, Show, Ord)
 
 data LValue
@@ -54,6 +55,7 @@ data Value -- literals
   | IntVal Int -- 1
   | BoolVal Bool -- false, true
   | StringVal String -- "abd"
+  | ArrayVal [Value] -- [v1, ..., vn]
   | FunctionVal [Name] Block -- (x1, ..., xn) { s }
   deriving
     ( Eq,
@@ -88,7 +90,7 @@ reserved =
   [ "and",
     "class", -- for class
     "else",
-    "else if", -- TODO: figure out edge case with spacing
+    "else if",
     "false",
     "for",
     "fun",
@@ -102,7 +104,7 @@ reserved =
     "true",
     "var",
     "while",
-    "print" -- do we like this
+    "print"
   ]
 
 level :: Bop -> Int
