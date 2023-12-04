@@ -174,8 +174,6 @@ loxAdvFunc =
       VarDecl "z" (FunctionCall (Var "t") [Var "y"])
     ]
 
-
-
 class PP a where
   pp :: a -> Doc
 
@@ -187,7 +185,6 @@ pretty = PP.render . pp
 -- | Compact version. Displays its argument without newlines.
 -- oneLine :: (PP a) => a -> String
 -- oneLine = PP.renderStyle (PP.style {PP.mode = PP.OneLineMode}) . pp
-
 instance PP Uop where
   pp Neg = PP.char '-'
   pp Not = PP.text "not"
@@ -253,7 +250,6 @@ instance PP Expression where
       commaSep = foldr1 (\a b -> a <+> PP.text "," <+> b)
   pp _ = undefined
 
-
 instance PP Block where
   pp (Block [s]) = pp s
   pp (Block ss) = PP.vcat (map pp ss)
@@ -264,24 +260,24 @@ ppSS ss = PP.vcat (map pp ss)
 instance PP Statement where
   pp (Assign x e) = pp x <+> PP.equals <+> pp e
   pp (If guard b1 b2) =
-    PP.hang (PP.text "if" <+> pp guard <+> PP.text "then") 2 (pp b1)
-      PP.$$ PP.nest 2 (PP.text "else" PP.$$ pp b2)
-      PP.$$ PP.text "end"
+    PP.hang (PP.text "if" <+> pp guard <+> PP.text "{") 2 (pp b1)
+      PP.$$ PP.nest 2 (PP.text "} else {" PP.$$ pp b2)
+      PP.$$ PP.text "}"
   pp (While guard e) =
-    PP.hang (PP.text "while" <+> pp guard <+> PP.text "do") 2 (pp e)
-      PP.$+$ PP.text "end"
+    PP.hang (PP.text "while" <+> pp guard <+> PP.text "{") 2 (pp e)
+      PP.$+$ PP.text "}"
   pp (Return x) = PP.text "return" <+> pp x
   pp Empty = PP.semi
   pp (VarDecl x e) = PP.text "var" <+> pp x <+> PP.equals <+> pp e
   pp (FunctionCallStatement name args) = pp name <+> parens (commaSep (map pp args))
-                              where
-                                parens d = PP.text "(" <> d <> PP.text ")"
-                                commaSep = foldr1 (\a b -> a <+> PP.text "," <+> b) -- Use <+>
+    where
+      parens d = PP.text "(" <> d <> PP.text ")"
+      commaSep = foldr1 (\a b -> a <+> PP.text "," <+> b) -- Use <+>
   pp (FunctionDef name params block) =
-    PP.hang (PP.text "func" <+> pp name <+> parens (commaSep (map pp params)) <+> PP.text "{") 2 (PP.nest 4 ( pp block ) ) <+> PP.text "}"
-      where
-        parens d = PP.text "(" <> d <> PP.text ")"
-        commaSep = foldr1 (\a b -> a <+> PP.text "," <+> b)
+    PP.hang (PP.text "func" <+> pp name <+> parens (commaSep (map pp params)) <+> PP.text "{") 2 (PP.nest 4 (pp block)) <+> PP.text "}"
+    where
+      parens d = PP.text "(" <> d <> PP.text ")"
+      commaSep = foldr1 (\a b -> a <+> PP.text "," <+> b)
   pp _ = undefined
 
 instance (PP a) => PP (Map Value a) where
