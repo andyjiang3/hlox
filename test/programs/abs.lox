@@ -1,5 +1,7 @@
+// test
 var x = 0 - 3
 
+// test 2
 if (x < 0) {
 	x = 0 - x
 }

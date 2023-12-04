@@ -181,9 +181,9 @@ returnP = Return <$> (stringP "return" *> expP)
 printP :: Parser Statement
 printP = Print <$> (stringP "print" *> expP)
 
--- ;
+-- // or ;
 emptyP :: Parser Statement
-emptyP = constP ";" Empty
+emptyP = (stringP "//" *> many (P.satisfy (/= '\n')) *> pure Empty) <|> constP ";" Empty
 
 -- Block parser --
 blockP :: Parser Block
