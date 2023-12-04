@@ -8,6 +8,7 @@ import Test.HUnit
 import Test.QuickCheck (Arbitrary (..), Gen)
 import Test.QuickCheck qualified as QC
 import Text.PrettyPrint (Doc, (<+>))
+import Text.PrettyPrint qualified as PP
 
 newtype Block = Block [Statement] -- s1 ... sn
   deriving (Eq, Show, Ord)
@@ -172,3 +173,124 @@ loxAdvFunc =
       FunctionDef "t" ["z"] (Block [Assign (LName "x") (Op2 (Var "x") Plus (Val (IntVal 1))), Return (Var "z")]),
       VarDecl "z" (FunctionCall (Var "t") [Var "y"])
     ]
+
+
+
+class PP a where
+  pp :: a -> Doc
+
+-- | Default operation for the pretty printer. Displays using standard formatting
+-- rules, with generous use of indentation and newlines.
+pretty :: (PP a) => a -> String
+pretty = PP.render . pp
+
+-- | Compact version. Displays its argument without newlines.
+-- oneLine :: (PP a) => a -> String
+-- oneLine = PP.renderStyle (PP.style {PP.mode = PP.OneLineMode}) . pp
+
+instance PP Uop where
+  pp Neg = PP.char '-'
+  pp Not = PP.text "not"
+
+instance PP Bool where
+  pp True = PP.text "true"
+  pp False = PP.text "false"
+
+instance PP String where
+  pp = PP.text
+
+instance PP Int where
+  pp = PP.int
+
+instance PP LValue where
+  pp (LName n) = PP.text n
+  pp _ = undefined
+
+instance PP Value where
+  pp (IntVal i) = pp i
+  pp (BoolVal b) = pp b
+  pp NilVal = PP.text "nil"
+  pp (StringVal s) = PP.text ("\"" <> s <> "\"")
+  pp (FunctionVal n blk) = parens (commaSep (map pp n)) <+> PP.text "{" <+> pp blk <+> PP.text "}"
+    where
+      parens d = PP.text "(" <> d <> PP.text ")"
+      commaSep = foldr1 (\a b -> a <+> PP.text "," <+> b)
+  pp _ = undefined
+
+isBase :: Expression -> Bool
+isBase Val {} = True
+isBase Var {} = True
+isBase Op1 {} = True
+isBase _ = False
+
+instance PP Bop where
+  pp Plus = PP.char '+'
+  pp Minus = PP.char '-'
+  pp Times = PP.char '*'
+  pp Divide = PP.text "//"
+  pp Modulo = PP.text "%"
+  pp Gt = PP.char '>'
+  pp Ge = PP.text ">="
+  pp Lt = PP.char '<'
+  pp Le = PP.text "<="
+  pp Eq = PP.text "=="
+  pp _ = undefined
+
+instance PP Expression where
+  pp (Var v) = pp v
+  pp (Val v) = pp v
+  pp (Op1 o v) = pp o <+> if isBase v then pp v else PP.parens (pp v)
+  pp e@Op2 {} = ppPrec 0 e
+    where
+      ppPrec n (Op2 e1 bop e2) =
+        ppParens (level bop < n) $
+          ppPrec (level bop) e1 <+> pp bop <+> ppPrec (level bop + 1) e2
+      ppPrec _ e' = pp e'
+      ppParens b = if b then PP.parens else id
+  pp (FunctionCall name args) = pp name <+> parens (commaSep (map pp args))
+    where
+      parens d = PP.text "(" <> d <> PP.text ")"
+      commaSep = foldr1 (\a b -> a <+> PP.text "," <+> b)
+  pp _ = undefined
+
+
+instance PP Block where
+  pp (Block [s]) = pp s
+  pp (Block ss) = PP.vcat (map pp ss)
+
+ppSS :: [Statement] -> Doc
+ppSS ss = PP.vcat (map pp ss)
+
+instance PP Statement where
+  pp (Assign x e) = pp x <+> PP.equals <+> pp e
+  pp (If guard b1 b2) =
+    PP.hang (PP.text "if" <+> pp guard <+> PP.text "then") 2 (pp b1)
+      PP.$$ PP.nest 2 (PP.text "else" PP.$$ pp b2)
+      PP.$$ PP.text "end"
+  pp (While guard e) =
+    PP.hang (PP.text "while" <+> pp guard <+> PP.text "do") 2 (pp e)
+      PP.$+$ PP.text "end"
+  pp (Return x) = PP.text "return" <+> pp x
+  pp Empty = PP.semi
+  pp (VarDecl x e) = PP.text "var" <+> pp x <+> PP.equals <+> pp e
+  pp (FunctionCallStatement name args) = pp name <+> parens (commaSep (map pp args))
+                              where
+                                parens d = PP.text "(" <> d <> PP.text ")"
+                                commaSep = foldr1 (\a b -> a <+> PP.text "," <+> b) -- Use <+>
+  pp (FunctionDef name params block) =
+    PP.hang (PP.text "func" <+> pp name <+> parens (commaSep (map pp params)) <+> PP.text "{") 2 (PP.nest 4 ( pp block ) ) <+> PP.text "}"
+      where
+        parens d = PP.text "(" <> d <> PP.text ")"
+        commaSep = foldr1 (\a b -> a <+> PP.text "," <+> b)
+  pp _ = undefined
+
+instance (PP a) => PP (Map Value a) where
+  pp m = PP.braces (PP.vcat (map ppa (Map.toList m)))
+    where
+      ppa (StringVal s, v2) = PP.text s <+> PP.text "=" <+> pp v2
+      ppa (v1, v2) = PP.brackets (pp v1) <+> PP.text "=" <+> pp v2
+
+instance (PP a) => PP (Map Name a) where
+  pp m = PP.braces (PP.vcat (map ppa (Map.toList m)))
+    where
+      ppa (s, v2) = PP.text s <+> PP.text "=" <+> pp v2

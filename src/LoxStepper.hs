@@ -16,6 +16,8 @@ import Data.Map (Map, (!?))
 import Text.Read (readMaybe)
 import Data.Map qualified as Map
 import Data.Maybe (fromMaybe, isJust, isNothing)
+import Text.PrettyPrint (Doc, (<+>))
+import Text.PrettyPrint qualified as PP
 
 
 type Environment = Map Name Table
@@ -23,6 +25,10 @@ type Environment = Map Name Table
 type Table = Map Value Value
 
 data Store = St {environment :: Environment, parent :: Maybe Store} deriving (Eq, Show)
+
+
+instance PP Store where
+  pp (St e _) = pp e
 
 globalTableName  :: Name
 globalTableName = "_G"
@@ -559,86 +565,86 @@ initialStepper =
 
 -- stepper is an interactive IO function that will allow 
 -- users to load programs and interact with them
-stepper :: IO()
-stepper = undefined
+-- stepper :: IO()
+-- stepper = undefined
 
--- stepper :: IO ()
--- stepper = go initialStepper
---   where
---     go :: Stepper -> IO ()
---     go ss = do
---       prompt ss
---       putStr (fromMaybe "Lu" (filename ss) ++ "> ")
---       str <- getLine
---       case List.uncons (words str) of
---         -- load a file for stepping
---         Just (":l", [fn]) -> do
---           result <- LoxParser.parseLoxFile fn
---           case result of
---             (Left _) -> do
---               putStrLn "invalid file"
---               go ss
---             (Right blck) -> do
---               putStrLn ("Loaded " ++ fn ++ " ,initializing stepper")
---               go ss {filename = Just fn, block = blck}
---         -- go ss2
---         -- dump the store
---         Just (":d", _) -> do
---           putStrLn (pretty (store ss))
---           go ss
---         -- quit the stepper
---         Just (":q", _) -> return ()
---         -- run current block to completion
---         Just (":r", _) ->
---           let s' = exec (block ss) (store ss)
---            in go ss {block = mempty, store = s', history = Just ss}
---         -- next statement (could be multiple)
---         Just (":n", strs) -> do
---           let numSteps :: Int
---               numSteps = case readMaybe (concat strs) of
---                 Just x -> x
---                 Nothing -> 1
+stepper :: IO ()
+stepper = go initialStepper
+  where
+    go :: Stepper -> IO ()
+    go ss = do
+      prompt ss
+      putStr (fromMaybe "Lox" (filename ss) ++ "> ")
+      str <- getLine
+      case List.uncons (words str) of
+        -- load a file for stepping
+        Just (":l", [fn]) -> do
+          result <- LoxParser.parseLoxFile fn
+          case result of
+            (Left _) -> do
+              putStrLn "invalid file"
+              go ss
+            (Right blck) -> do
+              putStrLn ("Loaded " ++ fn ++ " ,initializing stepper")
+              go ss {filename = Just fn, block = blck}
+        -- go ss2
+        -- dump the store
+        Just (":d", _) -> do
+          putStrLn (pretty (store ss))
+          go ss
+        -- quit the stepper
+        Just (":q", _) -> return ()
+        -- run current block to completion
+        Just (":r", _) ->
+          let s' = exec (block ss) (store ss)
+           in go ss {block = mempty, store = s', history = Just ss}
+        -- next statement (could be multiple)
+        Just (":n", strs) -> do
+          let numSteps :: Int
+              numSteps = case readMaybe (concat strs) of
+                Just x -> x
+                Nothing -> 1
 
---           let res = exec numSteps ss in go res
---           where
---             exec n stepper
---               | n <= 0 = stepper
---               | case block stepper of Block xs -> null xs = stepper
---               | otherwise = case history stepper of
---                   Just prevStepper -> exec (n - 1) $ stepper {block = newBlock, store = newStore, history = Just stepper {history = Just prevStepper}}
---                   Nothing -> exec (n - 1) $ stepper {block = newBlock, store = newStore, history = Just stepper}
---               where
---                 (newBlock, newStore) = steps 1 (block stepper) (store stepper)
---         -- let (b', s') = steps numSteps (block ss) (store ss)
---         --   in go ss {block = b', store = s', history = Just ss}
---         -- go ss
+          let res = exec numSteps ss in go res
+          where
+            exec n stepper
+              | n <= 0 = stepper
+              | case block stepper of Block xs -> null xs = stepper
+              | otherwise = case history stepper of
+                  Just prevStepper -> exec (n - 1) $ stepper {block = newBlock, store = newStore, history = Just stepper {history = Just prevStepper}}
+                  Nothing -> exec (n - 1) $ stepper {block = newBlock, store = newStore, history = Just stepper}
+              where
+                (newBlock, newStore) = steps 1 (block stepper) (store stepper)
+        -- let (b', s') = steps numSteps (block ss) (store ss)
+        --   in go ss {block = b', store = s', history = Just ss}
+        -- go ss
 
---         -- previous statement
---         -- NOTE: this should revert steps of the evaluator not
---         -- commands to the stepper. With :n 5 followed by :p
---         -- it should back up a single statement, not five statements.
---         Just (":p", strs) -> do
---           let numSteps :: Int
---               numSteps = case readMaybe (concat strs) of
---                 Just x -> x
---                 Nothing -> 1
---           let res = reverse numSteps ss in go res
---           where
---             reverse n stepper
---               | n <= 0 = stepper -- Nothing to reverse
---               | otherwise = case history stepper of
---                   Just prevStepper -> reverse (n - 1) prevStepper
---                   Nothing -> stepper
---         -- evaluate an expression in the current state
---         _ -> case LuParser.parseLuExp str of
---           Right exp -> do
---             let v = evaluate exp (store ss)
---             putStrLn (pretty v)
---             go ss
---           Left _s -> do
---             putStrLn "?"
---             go ss
---     prompt :: Stepper -> IO ()
---     prompt Stepper {block = Block []} = return ()
---     prompt Stepper {block = Block (s : _)} =
---       putStr "--> " >> putStrLn (pretty s)
+        -- previous statement
+        -- NOTE: this should revert steps of the evaluator not
+        -- commands to the stepper. With :n 5 followed by :p
+        -- it should back up a single statement, not five statements.
+        Just (":p", strs) -> do
+          let numSteps :: Int
+              numSteps = case readMaybe (concat strs) of
+                Just x -> x
+                Nothing -> 1
+          let res = reverse numSteps ss in go res
+          where
+            reverse n stepper
+              | n <= 0 = stepper -- Nothing to reverse
+              | otherwise = case history stepper of
+                  Just prevStepper -> reverse (n - 1) prevStepper
+                  Nothing -> stepper
+        -- evaluate an expression in the current state
+        _ -> case LoxParser.parseLoxExp str of
+          Right exp -> do
+            let v = evaluate exp (store ss)
+            putStrLn (pretty v)
+            go ss
+          Left _s -> do
+            putStrLn "?"
+            go ss
+    prompt :: Stepper -> IO ()
+    prompt Stepper {block = Block []} = return ()
+    prompt Stepper {block = Block (s : _)} =
+      putStr "--> " >> putStrLn (pretty s)
