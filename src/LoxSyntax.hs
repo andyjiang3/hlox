@@ -119,3 +119,54 @@ level Eq = 5
 level Ne = 5
 level And = 4
 level Or = 3
+
+-- hello_world.lox
+loxTest :: Block
+loxTest =
+  Block
+    [ Print (Val (StringVal "Hello, world!"))
+    ]
+
+-- abs.lox
+loxAbs :: Block
+loxAbs =
+  Block
+    [ VarDecl "x" (Op2 (Val (IntVal 0)) Minus (Val (IntVal 3))),
+      If
+        (Op2 (Var "x") Lt (Val (IntVal 0)))
+        (Block [Assign (LName "x") (Op2 (Val (IntVal 0)) Minus (Var "x"))])
+        (Block [])
+    ]
+
+-- exp.lox
+loxExp :: Block
+loxExp =
+  Block
+    [ VarDecl "x1" (Op2 (Val (IntVal 1)) Plus (Val (IntVal 3))),
+      VarDecl "x2" (Op2 (Val (IntVal 1)) Plus (Val NilVal)),
+      VarDecl "x3" (Op2 (Val (IntVal 1)) Divide (Val (IntVal 0))),
+      VarDecl "x4" (Op2 (Val (IntVal 1)) Plus (Val (StringVal "s"))),
+      VarDecl "x5" (Op2 (Val (IntVal 1)) Lt (Val (BoolVal True))),
+      VarDecl "x6" (Op1 Not (Val (IntVal 1))),
+      VarDecl "x7" (Op2 (Val NilVal) Eq (Val (BoolVal True)))
+    ]
+
+-- basic_func.lox
+loxBasicFunc :: Block
+loxBasicFunc =
+  Block
+    [ VarDecl "x" (Val (IntVal 1)),
+      VarDecl "y" (Val (IntVal 2)),
+      FunctionDef "t" ["z"] (Block [Assign (LName "x") (Op2 (Var "x") Plus (Val (IntVal 1))), Return (Var "z")]),
+      FunctionCallStatement (Var "t") [Var "y"]
+    ]
+
+-- adv_func.lox
+loxAdvFunc :: Block
+loxAdvFunc =
+  Block
+    [ VarDecl "x" (Val (IntVal 1)),
+      VarDecl "y" (Val (IntVal 2)),
+      FunctionDef "t" ["z"] (Block [Assign (LName "x") (Op2 (Var "x") Plus (Val (IntVal 1))), Return (Var "z")]),
+      VarDecl "z" (FunctionCall (Var "t") [Var "y"])
+    ]
