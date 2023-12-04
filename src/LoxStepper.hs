@@ -231,6 +231,7 @@ step (Block w@(While e wb : ss)) = do
         Block bs -> return $ Block $ bs ++ w
     else -- return (wb : w)
       return $ Block ss
+step (Block (Empty : ss)) = step $ Block ss
 step (Block (s : ss)) = do
   evalS s
   return $ Block ss
@@ -361,6 +362,9 @@ stepper = go initialStepper
             putStrLn "?"
             go ss
     prompt :: Stepper -> IO ()
-    prompt Stepper {block = Block []} = return ()
-    prompt Stepper {block = Block (s : _)} =
-      putStr "--> " >> putStrLn (pretty s)
+    prompt Stepper {block} = printFirst block
+
+    printFirst :: Block -> IO ()
+    printFirst (Block []) = return ()
+    printFirst (Block (Empty : ss)) = printFirst (Block ss)
+    printFirst (Block (s : _)) = putStr "--> " >> putStrLn (pretty s)

@@ -6,4 +6,4 @@ fun t(z) {
 	return z + 6
 }
 
-var z = t(y)
+var z = t(y) + 1 // should be 9
