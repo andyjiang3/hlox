@@ -30,7 +30,7 @@ brackets x = P.between (stringP "[") x (stringP "]")
 
 -- Basic parsers --
 valueP :: Parser Value
-valueP = intValP <|> boolValP <|> nilValP <|> stringValP
+valueP = intValP <|> boolValP <|> nilValP <|> stringValP <|> funcValP
 
 intValP :: Parser Value
 intValP = IntVal <$> wsP P.int

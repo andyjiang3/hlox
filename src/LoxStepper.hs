@@ -304,8 +304,8 @@ stepper = go initialStepper
         Just (":l", [fn]) -> do
           result <- LoxParser.parseLoxFile fn
           case result of
-            (Left _) -> do
-              putStrLn "invalid file"
+            (Left s) -> do
+              putStrLn "Error Loading or Parsing file"
               go ss
             (Right blck) -> do
               putStrLn ("Loaded " ++ fn ++ " ,initializing stepper")
