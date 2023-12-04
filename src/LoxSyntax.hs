@@ -231,7 +231,9 @@ instance PP Bop where
   pp Lt = PP.char '<'
   pp Le = PP.text "<="
   pp Eq = PP.text "=="
-  pp _ = undefined
+  pp Ne = PP.text "!="
+  pp Or = PP.text "or"
+  pp And = PP.text "and"
 
 instance PP Expression where
   pp (Var v) = pp v
