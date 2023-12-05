@@ -1,4 +1,4 @@
-module LoxStepper where
+module LoxStepper (Store) where
 
 import Control.Applicative
 import Data.Char qualified as Char
@@ -20,65 +20,132 @@ import Text.PrettyPrint (Doc, (<+>))
 import Text.PrettyPrint qualified as PP
 
 
-type Environment = Map Name Table
+type Id = Int
+
+-- let n = length (Map.keys store)
+-- let tableName = "_t" ++ show n
+
+data Environment = Env {memory :: Map Name Table, parent :: Maybe Id} deriving (Eq)
 
 type Table = Map Value Value
 
-data Store = St {environment :: Environment, parent :: Maybe Store} deriving (Eq, Show)
+type Environments = Map Id Environment
+
+data Store = St {environment :: Id, environments :: Environments} deriving (Eq)
+
 
 
 instance PP Store where
-  pp (St e _) = pp e
+  pp (St e es) = case Map.lookup e es of 
+    Nothing -> PP.text "empty"
+    Just env -> pp (memory env)
 
 globalTableName  :: Name
 globalTableName = "_G"
 
-emptyEnv :: Map Name (Map k a)
-emptyEnv = Map.singleton globalTableName Map.empty
+emptyEnv :: Environment
+emptyEnv = Env {memory = Map.singleton globalTableName Map.empty, parent = Nothing}
 
 initialStore :: Store
-initialStore = St { environment = emptyEnv, parent = Nothing}
-
-
-
+initialStore = St { environment = 0, environments = Map.fromList [ (0, emptyEnv) ]}
 
 type Reference = (Name, Value)
 
-index :: Reference -> State Store Value
-index (t, n) = do
+
+getEnvironment :: Id -> State Store (Maybe Environment)
+getEnvironment id = do Map.lookup id . environments <$> S.get
+
+
+indexRecursive :: Reference -> Id -> State Store Value
+indexRecursive (t,n) id = do
   store <- S.get
-  let valMaybe = let env = environment store in env !? t >>= (!? n)
-  let u :: Value = case parent store of 
-        Nothing -> NilVal
-        Just st -> let b = index (t,n) in S.evalState b st
-  return $ fromMaybe u valMaybe
+  maybeEnv <- getEnvironment id
+  let env = fromMaybe emptyEnv maybeEnv
+  let valMaybe = memory env !? t >>= (!? n)
+  case valMaybe of 
+    Just val -> return val
+    Nothing -> case parent env of 
+      Just p -> indexRecursive(t,n) p
+      Nothing -> return NilVal
 
 
-updateOnce :: Reference -> Value -> State Store Bool 
-updateOnce (_, NilVal) _ = return True
-updateOnce (table, name) val = do
+index :: Reference -> State Store Value
+index ref@(t, n) = do
+  store <- S.get
+  indexRecursive ref (environment store)
+
+
+
+-- updateRecursive :: Reference -> Id -> Value -> State Store Bool
+-- updateRecursive ref@(table, name) id val = do  
+--   store <- S.get
+--     let newStore :: Maybe Store = do 
+--       oldTable <- environments store !? id
+--       guard (isJust Map.lookup name oldTable)
+--       let new table = Map.insert name val oldTable
+--       undefined
+
+updateRecursive :: Reference -> Id -> Value -> State Store ()
+updateRecursive ref@(table, name) id val = do
   store <- S.get
   let newStore :: Maybe Store =
         do
-          oldTable <- environment store !? table
+          env <- environments store !? id
+          oldTable <- memory env !? table
           guard (isJust $ Map.lookup name oldTable)
           let newTable = Map.insert name val oldTable
-          return $ store {environment = Map.insert table newTable (environment store)}
-  S.put $ fromMaybe store newStore
-  return $ isJust newStore
+          let newMemory = Map.insert table newTable (memory env)
+          return $ store {environments = Map.insert id (env {memory = newMemory}) (environments store)}
+  case newStore of
+    Just new -> S.put new 
+    Nothing -> case environments store !? id of 
+      Nothing -> return ()
+      Just env -> case parent env of
+        Nothing -> return ()
+        Just p -> updateRecursive ref p val
 
 
 update :: Reference -> Value -> State Store ()
 update (_, NilVal) _ = return ()
 update ref@(t, n) val = do
   store <- S.get
-  v <- updateOnce ref val 
-  if  v then return () else
-    case parent store of 
-            Nothing -> return ()
-            Just p -> let newParent :: Store = S.execState (updateOnce ref val) p in
-                let st2 = St {environment = environment store, parent = Just newParent} in
-                    S.put st2
+  updateRecursive ref (environment store) val
+  -- if v
+  --   then return ()
+  --   else case parent store of
+  --     Nothing -> return ()
+  --     Just p ->
+  --       let newParent :: Store = S.execState (updateOnce ref val) p
+  --        in let st2 = St {environment = environment store, parent = Just newParent}
+  --            in S.put st2
+
+
+
+-- updateOnce :: Reference -> Value -> State Store Bool 
+-- updateOnce (_, NilVal) _ = return True
+-- updateOnce (table, name) val = do
+--   store <- S.get
+--   let newStore :: Maybe Store =
+--         do
+--           oldTable <- environment store !? table
+--           guard (isJust $ Map.lookup name oldTable)
+--           let newTable = Map.insert name val oldTable
+--           return $ store {environment = Map.insert table newTable (environment store)}
+--   S.put $ fromMaybe store newStore
+--   return $ isJust newStore
+
+
+-- update :: Reference -> Value -> State Store ()
+-- update (_, NilVal) _ = return ()
+-- update ref@(t, n) val = do
+--   store <- S.get
+--   v <- updateOnce ref val 
+--   if  v then return () else
+--     case parent store of 
+--             Nothing -> return ()
+--             Just p -> let newParent :: Store = S.execState (updateOnce ref val) p in
+--                 let st2 = St {environment = environment store, parent = Just newParent} in
+--                     S.put st2
 
 
 allocate :: Reference -> Value -> State Store ()
@@ -86,11 +153,13 @@ allocate (_, NilVal) _ = return ()
 allocate (table, name) val = do
   store <- S.get
   let newStore :: Maybe Store =
-        do
-          oldTable <- environment store !? table
-          guard ( isNothing $ Map.lookup name oldTable)
+        do          
+          env <- environments store !? environment store
+          oldTable <- memory env !? table
+          guard (isNothing $ Map.lookup name oldTable)
           let newTable = Map.insert name val oldTable
-          return $ store { environment = Map.insert table newTable (environment store)}
+          let newMemory = Map.insert table newTable (memory env)
+          return $ store {environments = Map.insert (environment store) (env {memory = newMemory}) (environments store)}
   S.put $ fromMaybe store newStore
 
 
@@ -102,24 +171,50 @@ resolve _ = undefined
 
 functionPrologue :: Expression -> [Name] -> [Expression] -> State Store ()
 functionPrologue exp names args = do
-    st <- S.get
-    let st2 = St{environment =  emptyEnv, parent = Just st } in
-        let action1 = S.put st2 in 
-            let action2 = let pairs = zip names args in mapM_ (\(name, arg) -> let ref = resolve (LName name) in do 
-                        val <- evalE arg
-                        allocate ref val) pairs in sequence_ [action1, action2]
+  st <- S.get
+  let newEnv = emptyEnv {parent = Just $ environment st}
+  let n = length (Map.keys (environments st))
+  let newStore = st {environment = n, environments = Map.insert n newEnv (environments st)}
+  -- let st2 = St {environment = emptyEnv, parent = Just st}
+   in let action1 = S.put newStore
+       in let action2 =
+                let pairs = zip names args
+                 in mapM_
+                      ( \(name, arg) ->
+                          let ref = resolve (LName name)
+                           in do
+                                val <- evalE arg
+                                allocate ref val
+                      )
+                      pairs
+           in sequence_ [action1, action2]
+
+-- functionPrologue :: Expression -> [Name] -> [Expression] -> State Store ()
+-- functionPrologue exp names args = do
+--     st <- S.get
+--     let st2 = St{environment =  emptyEnv, parent = Just st } in
+--         let action1 = S.put st2 in 
+--             let action2 = let pairs = zip names args in mapM_ (\(name, arg) -> let ref = resolve (LName name) in do 
+--                         val <- evalE arg
+--                         allocate ref val) pairs in sequence_ [action1, action2]
 
 
 
 
 functionEpilogue :: State Store ()
 functionEpilogue = do
-    st <- S.get
-    S.put $ fromMaybe st (parent st)
+  store <- S.get
+  let newStore :: Maybe Store =
+        do
+          env <- environments store !? environment store
+          p <- parent env 
+          return store {environment = p}
+  S.put $ fromMaybe store newStore
+    -- S.put $ fromMaybe st (parent st)
     
 
 evalE :: Expression -> State Store Value
-evalE (Var name) = index (globalTableName, StringVal name)
+evalE (Var name) = index  (globalTableName, StringVal name)
 evalE (Val v) = return v
 evalE (Op2 e1 o e2) = evalOp2 o <$> evalE e1 <*> evalE e2
 evalE (Op1 _o _e1) = evalE _e1 >>= evalOp1 _o
@@ -368,3 +463,178 @@ stepper = go initialStepper
     printFirst (Block []) = return ()
     printFirst (Block (Empty : ss)) = printFirst (Block ss)
     printFirst (Block (s : _)) = putStr "--> " >> putStrLn (pretty s)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+mem1 =
+  Map.fromList
+    [ ( globalTableName,
+        Map.fromList
+          [(StringVal "x", IntVal 3)]
+      ),
+      ( "_t1",
+        Map.fromList
+          [ (StringVal "y", BoolVal True)
+          ]
+      )
+    ]
+
+mem2 =
+  Map.fromList
+    [ ( globalTableName,
+        Map.fromList
+          [(StringVal "z", IntVal 3)]
+      ),
+      ( "_t2",
+        Map.fromList
+          [ (IntVal 4, BoolVal True)
+          ]
+      )
+    ]
+
+env1 = Env {memory = mem1, parent = Nothing}
+env2 = Env {memory = mem2, parent = Just 0}
+
+envs1 = Map.fromList [(0, env1)]
+
+envs2 = Map.fromList [(0, env1), (1, env2)]
+
+extendedStore :: Store
+extendedStore =
+  St
+    { environment = 0,
+      environments = envs1
+    }
+
+extendedStore2 :: Store
+extendedStore2 =
+  St
+    { environment = 1,
+      environments = envs2
+    }
+
+-- functionVal :: Value
+-- functionVal =
+--   let name = Var "f"
+--    in let args :: [Name] = ["arg1"]
+--        in let returnExp :: Expression = Op2 (Val (IntVal 1)) Plus (Var "arg1")
+--            in let statement = Return returnExp
+--                in let block = Block []
+--                    in FunctionVal args block
+
+-- functionStore :: Store
+-- functionStore =
+--   St
+--     { environment =
+--         Map.fromList
+--           [ ( globalTableName,
+--               Map.fromList
+--                 [(StringVal "x", IntVal 3), (StringVal "f", functionVal)]
+--             ),
+--             ( "_t1",
+--               Map.fromList
+--                 [ (StringVal "y", BoolVal True)
+--                 ]
+--             )
+--           ],
+--       parent = Nothing
+--     }
+
+xref :: Reference
+xref = ("_G", StringVal "x")
+
+yref :: Reference
+yref = ("_t1", StringVal "y")
+
+zref :: Reference
+zref = ("_t2", IntVal 4)
+
+wref :: Reference
+wref = ("_t1", IntVal 0)
+
+test_index :: Test
+test_index =
+  "index tests"
+    ~: TestList
+      [ -- The global variable "x" is unitialized (i.e. not present in the initial store)
+        S.evalState (index xref) initialStore ~?= NilVal,
+        -- But there is a value for "x" available in the extended store
+        S.evalState (index xref) extendedStore ~?= IntVal 3,
+        -- If a table name is not found in the store, accessing its reference also returns nil.
+        S.evalState (index yref) initialStore ~?= NilVal,
+        -- We should also be able to access "t[1]" in the extended store
+        S.evalState (index yref) extendedStore ~?= BoolVal True,
+        -- Updates using the `nil` key are ignored
+        -- S.execState (update ("_t1", NilVal) (IntVal 3)) extendedStore ~?= extendedStore,
+        S.evalState (index yref) extendedStore2 ~?= BoolVal True
+      ]
+
+
+-- intSt :: Store
+-- intSt =
+--   St {environment = Map.fromList [("_G", Map.fromList [(StringVal "u", IntVal 1), (StringVal "z", IntVal 3)])], parent = Just (St {environment = Map.fromList [("_G", Map.fromList [(StringVal "t", FunctionVal ["z"] (Block [Assign (LName "x") (Op2 (Var "x") Plus (Val (IntVal 4))), Assign (LName "z") (Op2 (Var "z") Plus (Val (IntVal 1))), Return (Var "x")])), (StringVal "x", IntVal 12), (StringVal "y", IntVal 2)])], parent = Nothing})}
+-- op :: Statement
+-- op = Assign (LName "x") (Op2 (Var "x") Plus (Val (IntVal 4)))
+
+tref :: (String, Value)
+tref = ("_G", StringVal "x")
+
+test_update :: Test
+test_update =
+  "index tests"
+    ~: TestList
+      [ -- If we assign to x, then we can find its new value
+        -- If we assign to x, then remove it, we cannot find it anymore
+        S.evalState (update xref (IntVal 4) >> update xref NilVal >> index xref) initialStore ~?= NilVal,
+        -- If we assign to t.y, then we can find its new value
+        S.evalState (update yref (IntVal 5) >> index yref) extendedStore ~?= IntVal 5,
+        -- If we assign nil to t.y, then we cannot find it
+        S.evalState (update yref NilVal >> index yref) extendedStore ~?= NilVal,
+        S.evalState (update yref NilVal >> index yref) extendedStore2 ~?= NilVal,
+        S.evalState (update zref (IntVal 30) >> index zref) extendedStore2 ~?= IntVal 30,
+        S.evalState (update wref (IntVal 30) >> index wref) extendedStore2 ~?= NilVal
+        -- S.evalState (evalS op >> index tref) intSt ~?= IntVal 16,
+        -- S.evalState (update tref (IntVal 30) >> index tref) intSt ~?= IntVal 30
+      ]
+
+
+test_allocate :: Test
+test_allocate =
+  "allocate tests"
+    ~: TestList
+      [
+        S.evalState (allocate xref (IntVal 4) >> index xref) initialStore ~?= IntVal 4,
+        S.evalState (allocate xref (IntVal 4) >> index xref) extendedStore ~?= IntVal 2
+      ]
+
+-- >>> runTestTT test_update
+-- Counts {cases = 6, tried = 6, errors = 0, failures = 0}
+
+
+
