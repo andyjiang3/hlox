@@ -32,6 +32,7 @@ data Statement
   | FunctionDef Name [Name] Block -- fun f(x1, ..., xn) { s }
   | Return Expression -- return e
   | Print Expression -- print e
+  | Pop -- used by stepper to pop scope stack
   | Empty -- ';'
   deriving (Eq, Show, Ord)
 
@@ -270,6 +271,7 @@ instance PP Statement where
       PP.$+$ PP.text "}"
   pp (Return x) = PP.text "return" <+> pp x
   pp Empty = PP.semi
+  pp Pop = PP.semi
   pp (VarDecl x e) = PP.text "var" <+> pp x <+> PP.equals <+> pp e
   pp (FunctionCallStatement name args) = pp name <+> parens (commaSep (map pp args))
     where
