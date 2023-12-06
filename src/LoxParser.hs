@@ -45,7 +45,7 @@ stringValP :: Parser Value
 stringValP = StringVal <$> wsP (P.between (P.string "\"") (many (P.satisfy (/= '"'))) (P.string "\""))
 
 funcValP :: Parser Value
-funcValP = FunctionVal <$> (stringP "\\" *> parens (P.sepBy varP (stringP ","))) <*> braces blockP
+funcValP = FunctionValIncomplete <$> (stringP "\\" *> parens (P.sepBy varP (stringP ","))) <*> braces blockP
 
 -- Expression parser --
 expP :: Parser Expression

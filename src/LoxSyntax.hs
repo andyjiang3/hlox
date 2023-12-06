@@ -58,7 +58,8 @@ data Value -- literals
   | BoolVal Bool -- false, true
   | StringVal String -- "abd"
   | ArrayVal [Value] -- [v1, ..., vn]
-  | FunctionVal [Name] Block -- \(x1, ..., xn) { s }, supports anonymous function
+  | FunctionValIncomplete [Name] Block
+  | FunctionVal [Name] Block Id-- \(x1, ..., xn) { s }, supports anonymous function
   deriving
     ( Eq,
       Show,
@@ -175,6 +176,10 @@ loxAdvFunc =
       VarDecl "z" (FunctionCall (Var "t") [Var "y"])
     ]
 
+
+type Id = Int
+
+
 class PP a where
   pp :: a -> Doc
 
@@ -209,7 +214,11 @@ instance PP Value where
   pp (BoolVal b) = pp b
   pp NilVal = PP.text "nil"
   pp (StringVal s) = PP.text ("\"" <> s <> "\"")
-  pp (FunctionVal n blk) = parens (commaSep (map pp n)) <+> PP.text "{" <+> pp blk <+> PP.text "}"
+  pp (FunctionVal n blk _) = parens (commaSep (map pp n)) <+> PP.text "{" <+> pp blk <+> PP.text "}"
+    where
+      parens d = PP.text "(" <> d <> PP.text ")"
+      commaSep = foldr1 (\a b -> a <+> PP.text "," <+> b)
+  pp (FunctionValIncomplete n blk) = parens (commaSep (map pp n)) <+> PP.text "{" <+> pp blk <+> PP.text "}"
     where
       parens d = PP.text "(" <> d <> PP.text ")"
       commaSep = foldr1 (\a b -> a <+> PP.text "," <+> b)

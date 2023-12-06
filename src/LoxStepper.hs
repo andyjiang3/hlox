@@ -19,25 +19,18 @@ import Data.Maybe (fromMaybe, isJust, isNothing)
 import Text.PrettyPrint (Doc, (<+>))
 import Text.PrettyPrint qualified as PP
 
-
-type Id = Int
-
--- let n = length (Map.keys store)
--- let tableName = "_t" ++ show n
+type Table = Map Value Value
 
 data Environment = Env {memory :: Map Name Table, parent :: Maybe Id} deriving (Eq)
 
-data Stack = Stk {curr :: Id, par :: Maybe Stack} deriving (Eq)
-
-type Table = Map Value Value
-
 type Environments = Map Id Environment
+
+data Stack = Stk {curr :: Id, par :: Maybe Stack} deriving (Eq)
 
 data Store = St {environment :: Id, environments :: Environments, stack :: Stack} deriving (Eq)
 
-
-
 instance PP Store where
+  pp :: Store -> Doc
   pp (St e es _) = case Map.lookup e es of 
     Nothing -> PP.text "empty"
     Just env -> pp (memory env)
@@ -121,8 +114,8 @@ resolve :: LValue -> Reference
 resolve (LName n) = (globalTableName, StringVal n)
 resolve _ = undefined
 
-functionPrologue :: Expression -> [Name] -> [Expression] -> State Store ()
-functionPrologue exp names args = do
+functionPrologue :: Expression -> [Name] -> [Expression] -> Id -> State Store ()
+functionPrologue exp names args id = do
   st <- S.get
   enterScope f
   let pairs = zip names args
@@ -135,7 +128,7 @@ functionPrologue exp names args = do
         )
         pairs
   where 
-    f = functionEnterScope
+    f = functionEnterScope id
 
 
 enterScope :: (Store -> Store) -> State Store ()
@@ -156,10 +149,10 @@ defaultEnterScope = do
 
 
 -- modify such that the parent of the new Env should be fetched from the function value
-functionEnterScope :: Store -> Store
-functionEnterScope st = st {environment = n, environments = Map.insert n newEnv (environments st), stack = newStack}
+functionEnterScope :: Id -> Store -> Store
+functionEnterScope id st = st {environment = n, environments = Map.insert n newEnv (environments st), stack = newStack}
   where
-    newEnv = emptyEnv {parent = Just $ environment st}
+    newEnv = emptyEnv {parent = Just id}
     n = length (Map.keys (environments st))
     newStack = Stk {curr = n, par = Just $ stack st}
 
@@ -179,15 +172,17 @@ functionEpilogue = exitScope
 
 evalE :: Expression -> State Store Value
 evalE (Var name) = index  (globalTableName, StringVal name)
+evalE (Val (FunctionValIncomplete names blk)) = do FunctionVal names blk . environment <$> S.get
 evalE (Val v) = return v
 evalE (Op2 e1 o e2) = evalOp2 o <$> evalE e1 <*> evalE e2
 evalE (Op1 _o _e1) = evalE _e1 >>= evalOp1 _o
 evalE (FunctionCall e es) = do 
     fun <- evalE e
     case fun of 
-        FunctionVal names blk -> do functionPrologue e names es; 
-                                    val <- eval blk
-                                    return $ fromMaybe NilVal val
+        FunctionVal names blk id -> do 
+                                      functionPrologue e names es id; 
+                                      val <- eval blk
+                                      return $ fromMaybe NilVal val
         _ -> return NilVal
 evalE _ = undefined
     
@@ -240,14 +235,16 @@ evalS (Return e) = do
     functionEpilogue
     return (Just val)
 evalS (FunctionDef name names blk) = do
+  st <- S.get
   let ref = (globalTableName,  StringVal name)
-  let fun = FunctionVal names blk
+  let fun = FunctionVal names blk (environment st)
   allocate ref fun
   return Nothing
 evalS (FunctionCallStatement name args) = do
   fun <- evalE name
   case fun of 
-        FunctionVal names blk -> do functionPrologue name names args;
+        FunctionVal names blk id -> do
+                                      functionPrologue name names args id;
                                       eval blk
         _ -> return Nothing 
 
