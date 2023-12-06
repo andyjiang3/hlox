@@ -1,4 +1,4 @@
-module LoxParser where
+module LoxParser where 
 
 import Control.Applicative
 import Data.Char qualified as Char

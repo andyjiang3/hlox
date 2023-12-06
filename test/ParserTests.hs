@@ -43,8 +43,8 @@ test_stringValP =
 test_funcValP :: Test
 test_funcValP =
   TestList
-    [ P.parse funcValP "\\(x1, x2) { y=4 }" ~?= Right (FunctionVal ["x1", "x2"] (Block [Assign (LName "y") (Val (IntVal 4))])),
-      P.parse (many funcValP) "\\(x1, x2) { y=4 } \\(x1, x2) { y=4 }" ~?= Right [FunctionVal ["x1", "x2"] (Block [Assign (LName "y") (Val (IntVal 4))]), FunctionVal ["x1", "x2"] (Block [Assign (LName "y") (Val (IntVal 4))])]
+    [ P.parse funcValP "\\(x1, x2) { y=4 }" ~?= Right (FunctionValIncomplete ["x1", "x2"] (Block [Assign (LName "y") (Val (IntVal 4))])),
+      P.parse (many funcValP) "\\(x1, x2) { y=4 } \\(x1, x2) { y=4 }" ~?= Right [FunctionValIncomplete ["x1", "x2"] (Block [Assign (LName "y") (Val (IntVal 4))]), FunctionValIncomplete ["x1", "x2"] (Block [Assign (LName "y") (Val (IntVal 4))])]
     ]
 
 tParseFiles :: Test

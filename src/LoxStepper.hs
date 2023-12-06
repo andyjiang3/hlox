@@ -1,4 +1,4 @@
-module LoxStepper (Store) where
+module LoxStepper  where
 
 import Control.Applicative
 import Data.Char qualified as Char
@@ -21,13 +21,13 @@ import Text.PrettyPrint qualified as PP
 
 type Table = Map Value Value
 
-data Environment = Env {memory :: Map Name Table, parent :: Maybe Id} deriving (Eq)
+data Environment = Env {memory :: Map Name Table, parent :: Maybe Id} deriving (Eq, Show)
 
 type Environments = Map Id Environment
 
-data Stack = Stk {curr :: Id, par :: Maybe Stack} deriving (Eq)
+data Stack = Stk {curr :: Id, par :: Maybe Stack} deriving (Eq, Show)
 
-data Store = St {environment :: Id, environments :: Environments, stack :: Stack} deriving (Eq)
+data Store = St {environment :: Id, environments :: Environments, stack :: Stack} deriving (Eq, Show)
 
 instance PP Store where
   pp :: Store -> Doc
