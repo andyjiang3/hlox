@@ -21,12 +21,16 @@ import Text.PrettyPrint qualified as PP
 
 type Table = Map Value Value
 
+-- local variables a scope is working with, helps find where the correct parent environment is for closures
 data Environment = Env {memory :: Map Name Table, parent :: Maybe Id} deriving (Eq, Show)
 
+-- map from environment id to an actual environment
 type Environments = Map Id Environment
 
+-- Stack of environments id, helps go back when scope ended
 data Stack = Stk {curr :: Id, par :: Maybe Stack} deriving (Eq, Show)
 
+-- Store holds current environment, stack the map of Environemnts
 data Store = St {environment :: Id, environments :: Environments, stack :: Stack} deriving (Eq, Show)
 
 instance PP Store where
@@ -88,13 +92,14 @@ updateRecursive ref@(table, name) id val = do
         Nothing -> return ()
         Just p -> updateRecursive ref p val
 
-
+-- updates only existing variable
 update :: Reference -> Value -> State Store ()
 update (_, NilVal) _ = return ()
 update ref@(t, n) val = do
   store <- S.get
   updateRecursive ref (environment store) val
 
+-- defines the variable
 allocate :: Reference -> Value -> State Store ()
 allocate (_, NilVal) _ = return ()
 allocate (table, name) val = do
@@ -248,11 +253,11 @@ evalS (FunctionCallStatement name args) = do
                                       eval blk
         _ -> return Nothing 
 
-evalS Pop = do 
+evalS EndStatement = do
   exitScope
   return Nothing
 
-evalS _ = undefined
+evalS _ = return Nothing
 
 
 -- evaluate a block to completion
@@ -278,7 +283,7 @@ step b@(Block []) = return b
 step (Block (If e (Block b1) (Block b2) : ss)) = do
   v <- evalE e
   defaultEnterScope
-  return $ Block $ if toBool v then b1 ++ [Pop] ++ ss else b2 ++ [Pop] ++ ss
+  return $ Block $ if toBool v then b1 ++ [EndStatement] ++ ss else b2 ++ [EndStatement] ++ ss
 step b@(Block (While e wb@(Block []) : ss)) = do
   v <- evalE e
   if toBool v
@@ -293,7 +298,7 @@ step (Block w@(While e wb : ss)) = do
     else -- return (wb : w)
       return $ Block ss
 step (Block (Empty : ss)) = step $ Block ss
-step (Block (Pop : ss)) = do evalS Pop; step $ Block ss
+step (Block (EndStatement : ss)) = do evalS EndStatement; step $ Block ss
 step (Block (s : ss)) = do
   evalS s
   return $ Block ss
@@ -426,5 +431,5 @@ stepper = go initialStepper
     printFirst :: Block -> IO ()
     printFirst (Block []) = return ()
     printFirst (Block (Empty : ss)) = printFirst (Block ss)
-    printFirst (Block (Pop : ss)) = printFirst (Block ss)
+    printFirst (Block (EndStatement : ss)) = printFirst (Block ss)
     printFirst (Block (s : _)) = putStr "--> " >> putStrLn (pretty s)

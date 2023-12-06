@@ -2,7 +2,7 @@ var x = 1
 var y = 2
 
 fun t(z) {
-	x = x + 1
+	x = x + 1 // x = 2
 	return z + 6
 }
 

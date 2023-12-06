@@ -32,7 +32,7 @@ data Statement
   | FunctionDef Name [Name] Block -- fun f(x1, ..., xn) { s }
   | Return Expression -- return e
   | Print Expression -- print e
-  | Pop -- used by stepper to pop scope stack
+  | EndStatement -- only used internally
   | Empty -- ';'
   deriving (Eq, Show, Ord)
 
@@ -217,11 +217,11 @@ instance PP Value where
   pp (FunctionVal n blk _) = parens (commaSep (map pp n)) <+> PP.text "{" <+> pp blk <+> PP.text "}"
     where
       parens d = PP.text "(" <> d <> PP.text ")"
-      commaSep = foldr1 (\a b -> a <+> PP.text "," <+> b)
+      commaSep = foldr (\a b -> a <+> PP.text "," <+> b) (PP.text "")
   pp (FunctionValIncomplete n blk) = parens (commaSep (map pp n)) <+> PP.text "{" <+> pp blk <+> PP.text "}"
     where
       parens d = PP.text "(" <> d <> PP.text ")"
-      commaSep = foldr1 (\a b -> a <+> PP.text "," <+> b)
+      commaSep = foldr (\a b -> a <+> PP.text "," <+> b) (PP.text "")
   pp _ = undefined
 
 isBase :: Expression -> Bool
@@ -259,8 +259,8 @@ instance PP Expression where
   pp (FunctionCall name args) = pp name <+> parens (commaSep (map pp args))
     where
       parens d = PP.text "(" <> d <> PP.text ")"
-      commaSep = foldr1 (\a b -> a <+> PP.text "," <+> b)
-  pp _ = undefined
+      commaSep = foldr (\a b -> a <+> PP.text "," <+> b) (PP.text "")
+  pp _ = PP.text ""
 
 instance PP Block where
   pp (Block [s]) = pp s
@@ -280,17 +280,17 @@ instance PP Statement where
       PP.$+$ PP.text "}"
   pp (Return x) = PP.text "return" <+> pp x
   pp Empty = PP.semi
-  pp Pop = PP.semi
+  pp EndStatement = PP.semi
   pp (VarDecl x e) = PP.text "var" <+> pp x <+> PP.equals <+> pp e
   pp (FunctionCallStatement name args) = pp name <+> parens (commaSep (map pp args))
     where
       parens d = PP.text "(" <> d <> PP.text ")"
-      commaSep = foldr1 (\a b -> a <+> PP.text "," <+> b) -- Use <+>
+      commaSep = foldr (\a b -> a <+> PP.text "," <+> b) (PP.text "") -- Use <+>
   pp (FunctionDef name params block) =
     PP.hang (PP.text "func" <+> pp name <+> parens (commaSep (map pp params)) <+> PP.text "{") 2 (PP.nest 4 (pp block)) <+> PP.text "}"
     where
       parens d = PP.text "(" <> d <> PP.text ")"
-      commaSep = foldr1 (\a b -> a <+> PP.text "," <+> b)
+      commaSep = foldr (\a b -> a <+> PP.text "," <+> b) (PP.text "")
   pp _ = undefined
 
 instance (PP a) => PP (Map Value a) where

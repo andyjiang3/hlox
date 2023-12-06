@@ -1,0 +1,12 @@
+var outside = 7
+fun outer() {
+    var outside = 5
+    fun inner () {
+        outside = outside + 1
+        return outside
+    }
+    return inner
+}
+var t = outer()
+var x = t()
+
