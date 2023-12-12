@@ -1,23 +1,23 @@
-module LoxStepper  where
+module LoxStepper where
 
 import Control.Applicative
-import Data.Char qualified as Char
-import LoxSyntax
-import LoxParser
-import ParserLib (Parser)
-import ParserLib qualified as P
-import Test.HUnit (Assertion, Counts, Test (..), assert, runTestTT, (~:), (~?=))
-import Test.QuickCheck qualified as QC
-import State (State)
-import State qualified as S
-import Data.List qualified as List
 import Control.Monad (guard)
+import Data.Char qualified as Char
+import Data.List qualified as List
 import Data.Map (Map, (!?))
-import Text.Read (readMaybe)
 import Data.Map qualified as Map
 import Data.Maybe (fromMaybe, isJust, isNothing)
+import LoxParser
+import LoxSyntax
+import ParserLib (Parser)
+import ParserLib qualified as P
+import State (State)
+import State qualified as S
+import Test.HUnit (Assertion, Counts, Test (..), assert, runTestTT, (~:), (~?=))
+import Test.QuickCheck qualified as QC
 import Text.PrettyPrint (Doc, (<+>))
 import Text.PrettyPrint qualified as PP
+import Text.Read (readMaybe)
 
 type Table = Map Value Value
 
@@ -35,38 +35,35 @@ data Store = St {environment :: Id, environments :: Environments, stack :: Stack
 
 instance PP Store where
   pp :: Store -> Doc
-  pp (St e es _) = case Map.lookup e es of 
+  pp (St e es _) = case Map.lookup e es of
     Nothing -> PP.text "empty"
     Just env -> pp (memory env)
 
-globalTableName  :: Name
+globalTableName :: Name
 globalTableName = "_G"
 
 emptyEnv :: Environment
 emptyEnv = Env {memory = Map.singleton globalTableName Map.empty, parent = Nothing}
 
 initialStore :: Store
-initialStore = St { environment = 0, environments = Map.fromList [ (0, emptyEnv) ], stack = Stk {curr = 0, par = Nothing}}
+initialStore = St {environment = 0, environments = Map.fromList [(0, emptyEnv)], stack = Stk {curr = 0, par = Nothing}}
 
 type Reference = (Name, Value)
-
 
 getEnvironment :: Id -> State Store (Maybe Environment)
 getEnvironment id = do Map.lookup id . environments <$> S.get
 
-
 indexRecursive :: Reference -> Id -> State Store Value
-indexRecursive (t,n) id = do
+indexRecursive (t, n) id = do
   store <- S.get
   maybeEnv <- getEnvironment id
   let env = fromMaybe emptyEnv maybeEnv
   let valMaybe = memory env !? t >>= (!? n)
-  case valMaybe of 
+  case valMaybe of
     Just val -> return val
-    Nothing -> case parent env of 
-      Just p -> indexRecursive(t,n) p
+    Nothing -> case parent env of
+      Just p -> indexRecursive (t, n) p
       Nothing -> return NilVal
-
 
 index :: Reference -> State Store Value
 index ref@(t, n) = do
@@ -85,8 +82,8 @@ updateRecursive ref@(table, name) id val = do
           let newMemory = Map.insert table newTable (memory env)
           return $ store {environments = Map.insert id (env {memory = newMemory}) (environments store)}
   case newStore of
-    Just new -> S.put new 
-    Nothing -> case environments store !? id of 
+    Just new -> S.put new
+    Nothing -> case environments store !? id of
       Nothing -> return ()
       Just env -> case parent env of
         Nothing -> return ()
@@ -105,7 +102,7 @@ allocate (_, NilVal) _ = return ()
 allocate (table, name) val = do
   store <- S.get
   let newStore :: Maybe Store =
-        do          
+        do
           env <- environments store !? environment store
           oldTable <- memory env !? table
           guard (isNothing $ Map.lookup name oldTable)
@@ -113,7 +110,6 @@ allocate (table, name) val = do
           let newMemory = Map.insert table newTable (memory env)
           return $ store {environments = Map.insert (environment store) (env {memory = newMemory}) (environments store)}
   S.put $ fromMaybe store newStore
-
 
 resolve :: LValue -> Reference
 resolve (LName n) = (globalTableName, StringVal n)
@@ -124,34 +120,32 @@ functionPrologue exp names args id = do
   st <- S.get
   enterScope f
   let pairs = zip names args
-    in mapM_
+   in mapM_
         ( \(name, arg) ->
             let ref = resolve (LName name)
-              in do
+             in do
                   val <- evalE arg
                   allocate ref val
         )
         pairs
-  where 
+  where
     f = functionEnterScope id
-
 
 enterScope :: (Store -> Store) -> State Store ()
 enterScope f = do
   st <- S.get
   let newStore = f st
-  S.put newStore 
-
+  S.put newStore
 
 defaultEnterScope :: State Store ()
-defaultEnterScope = do 
-  enterScope f 
+defaultEnterScope = do
+  enterScope f
   where
-    f st = st {environment = n, environments = Map.insert n newEnv (environments st), stack = newStack} where 
-      newEnv = emptyEnv {parent = Just $ environment st}
-      n = length (Map.keys (environments st))
-      newStack = Stk {curr = n, par = Just $ stack st}
-
+    f st = st {environment = n, environments = Map.insert n newEnv (environments st), stack = newStack}
+      where
+        newEnv = emptyEnv {parent = Just $ environment st}
+        n = length (Map.keys (environments st))
+        newStack = Stk {curr = n, par = Just $ stack st}
 
 -- modify such that the parent of the new Env should be fetched from the function value
 functionEnterScope :: Id -> Store -> Store
@@ -170,27 +164,24 @@ exitScope = do
           return store {environment = curr p, stack = p}
   S.put $ fromMaybe store newStore
 
-
 functionEpilogue :: State Store ()
 functionEpilogue = exitScope
 
-
 evalE :: Expression -> State Store Value
-evalE (Var name) = index  (globalTableName, StringVal name)
+evalE (Var name) = index (globalTableName, StringVal name)
 evalE (Val (FunctionValIncomplete names blk)) = do FunctionVal names blk . environment <$> S.get
 evalE (Val v) = return v
 evalE (Op2 e1 o e2) = evalOp2 o <$> evalE e1 <*> evalE e2
 evalE (Op1 _o _e1) = evalE _e1 >>= evalOp1 _o
-evalE (FunctionCall e es) = do 
-    fun <- evalE e
-    case fun of 
-        FunctionVal names blk id -> do 
-                                      functionPrologue e names es id; 
-                                      val <- eval blk
-                                      return $ fromMaybe NilVal val
-        _ -> return NilVal
+evalE (FunctionCall e es) = do
+  fun <- evalE e
+  case fun of
+    FunctionVal names blk id -> do
+      functionPrologue e names es id
+      val <- eval blk
+      return $ fromMaybe NilVal val
+    _ -> return NilVal
 evalE _ = undefined
-    
 
 toBool :: Value -> Bool
 toBool (BoolVal False) = False
@@ -217,48 +208,43 @@ evalOp2 Lt v1 v2 = BoolVal $ v1 < v2
 evalOp2 Le v1 v2 = BoolVal $ v1 <= v2
 evalOp2 _ _ _ = NilVal
 
-
 evaluate :: Expression -> Store -> Value
 evaluate e = S.evalState (evalE e)
 
 -- Everything here is not sure
 
 evalS :: Statement -> State Store (Maybe Value)
-evalS (Assign lv e) = do 
-    val <- evalE e
-    let ref = resolve lv
-    update ref val
-    return Nothing
-    
-evalS (VarDecl n e ) = do
-    val <- evalE e
-    let ref = (globalTableName, StringVal n)
-    allocate ref val
-    return Nothing
-evalS (Return e) = do 
-    val <- evalE e
-    functionEpilogue
-    return (Just val)
+evalS (Assign lv e) = do
+  val <- evalE e
+  let ref = resolve lv
+  update ref val
+  return Nothing
+evalS (VarDecl n e) = do
+  val <- evalE e
+  let ref = (globalTableName, StringVal n)
+  allocate ref val
+  return Nothing
+evalS (Return e) = do
+  val <- evalE e
+  functionEpilogue
+  return (Just val)
 evalS (FunctionDef name names blk) = do
   st <- S.get
-  let ref = (globalTableName,  StringVal name)
+  let ref = (globalTableName, StringVal name)
   let fun = FunctionVal names blk (environment st)
   allocate ref fun
   return Nothing
 evalS (FunctionCallStatement name args) = do
   fun <- evalE name
-  case fun of 
-        FunctionVal names blk id -> do
-                                      functionPrologue name names args id;
-                                      eval blk
-        _ -> return Nothing 
-
+  case fun of
+    FunctionVal names blk id -> do
+      functionPrologue name names args id
+      eval blk
+    _ -> return Nothing
 evalS EndStatement = do
   exitScope
   return Nothing
-
 evalS _ = return Nothing
-
 
 -- evaluate a block to completion
 -- add support for early exit if there is a return
@@ -274,7 +260,6 @@ eval (Block ss) = go ss
 -- execute a block on a store
 exec :: Block -> Store -> Store
 exec = S.execState . eval
-
 
 -- step over a block on statement at a time
 -- add support for early exit if there is a return
@@ -303,8 +288,6 @@ step (Block (s : ss)) = do
   evalS s
   return $ Block ss
 
-
-
 -- step opver a block for a number of statements
 boundedStep :: Int -> Block -> State Store Block
 boundedStep i b | i > 0 = do
@@ -315,7 +298,6 @@ boundedStep _ b = return b
 -- exectute bounder step over a store
 steps :: Int -> Block -> Store -> (Block, Store)
 steps n block = S.runState (boundedStep n block)
-
 
 prop_step_total :: Block -> Store -> Bool
 prop_step_total b s = case S.runState (step b) s of
@@ -331,14 +313,12 @@ execStep :: Block -> Store -> Store
 execStep b | final b = id
 execStep b = uncurry execStep . steps 1 b
 
-
 prop_stepExec :: Block -> QC.Property
 prop_stepExec b =
   not (final b) QC.==> final b1 QC.==> m1 == m2
   where
     (b1, m1) = S.runState (boundedStep 100 b) initialStore
     m2 = exec b initialStore
-
 
 data Stepper = Stepper
   { filename :: Maybe String,
@@ -403,7 +383,6 @@ stepper = go initialStepper
                   Nothing -> exec (n - 1) $ stepper {block = newBlock, store = newStore, history = Just stepper}
               where
                 (newBlock, newStore) = steps 1 (block stepper) (store stepper)
-
         Just (":p", strs) -> do
           let numSteps :: Int
               numSteps = case readMaybe (concat strs) of
