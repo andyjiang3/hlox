@@ -94,6 +94,7 @@ genExp n =
   QC.frequency
     [ (1, Var <$> genName),
       (1, Val <$> arbitrary),
+      (n, ArrayCons <$> QC.listOf (genExp n')),
       (n, Op1 <$> arbitrary <*> genExp n'),
       (n, Op2 <$> genExp n' <*> arbitrary <*> genExp n')
     ]
@@ -148,6 +149,9 @@ first :: Block -> [Statement]
 first (Block []) = []
 first (Block (x : _)) = [x]
 
+genString :: Gen String
+genString = QC.vectorOf 5 $ QC.elements "abcdefg"
+
 instance Arbitrary Block where
   arbitrary = QC.sized genBlock
   shrink (Block ss) = [Block ss' | ss' <- shrink ss]
@@ -185,7 +189,8 @@ instance Arbitrary Value where
         BoolVal <$> arbitrary,
         pure NilVal,
         StringVal <$> genStringLit
-        -- note: do not generate table values
+        -- Note: Do not generate table values
+        -- Don't generate ArrayVal since it isnt used in the interpreter
       ]
 
   shrink (IntVal n) = IntVal <$> shrink n
