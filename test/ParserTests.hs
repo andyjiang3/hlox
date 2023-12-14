@@ -1,6 +1,3 @@
-{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
-
-{-# HLINT ignore "Use camelCase" #-}
 module ParserTests where
 
 import Control.Applicative
@@ -82,6 +79,7 @@ tParseFiles =
         (Left _) -> assert False
         (Right ast') -> assert (ast == ast')
 
+test_comb :: Test
 test_comb =
   "parsing combinators"
     ~: TestList
@@ -95,6 +93,7 @@ test_comb =
         P.parse (many (brackets (constP "1" 1))) "[1] [  1]   [1 ]" ~?= Right [1, 1, 1]
       ]
 
+test_value :: Test
 test_value =
   "parsing values"
     ~: TestList
@@ -107,6 +106,7 @@ test_value =
         P.parse (many stringValP) "\" a\"   \"b\"" ~?= Right [StringVal " a", StringVal "b"]
       ]
 
+test_exp :: Test
 test_exp =
   "parsing expressions"
     ~: TestList
@@ -124,6 +124,7 @@ test_exp =
         P.parse (many arrayConsP) "[1, 2, 3] [4, 5, 6]" ~?= Right [ArrayCons [Val (IntVal 1), Val (IntVal 2), Val (IntVal 3)], ArrayCons [Val (IntVal 4), Val (IntVal 5), Val (IntVal 6)]]
       ]
 
+test_stat :: Test
 test_stat =
   "parsing statements"
     ~: TestList
