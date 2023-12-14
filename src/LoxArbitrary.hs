@@ -118,18 +118,19 @@ genExp n =
 genStatement :: Int -> Gen Statement
 genStatement n | n <= 1 = QC.oneof [Assign <$> genLValue 0 <*> genExp 0, return Empty]
 genStatement n =
-  QC.frequency
-    [ (1, Assign <$> genLValue n' <*> genExp n'),
-      (1, VarDecl <$> genName <*> genExp n'),
-      (1, return Empty),
-      (n, If <$> genExp n' <*> genBlock n' <*> genBlock n'),
-      -- generate loops half as frequently as if statements
-      (n', For <$> genStatement n' <*> genExp n' <*> genStatement n' <*> genBlock n'),
-      (n', While <$> genExp n' <*> genBlock n'),
-      (n', FunctionCallStatement <$> genExp n' <*> QC.vectorOf 3 (genExp n')),
-      (n', FunctionDef <$> genName <*> QC.vectorOf 3 genName <*> genBlock n'), -- TODO: make sure it always have return at the end
-      (n', Return <$> genExp n')
-    ]
+  let name = genName
+   in QC.frequency
+        [ (1, Assign <$> genLValue n' <*> genExp n'),
+          (1, VarDecl <$> genName <*> genExp n'),
+          (1, return Empty),
+          (n, If <$> genExp n' <*> genBlock n' <*> genBlock n'),
+          -- generate loops half as frequently as if statements
+          (n', For <$> (VarDecl <$> name <*> genExp n') <*> genExp n' <*> (Assign <$> (LName <$> name) <*> genExp n') <*> genBlock n'),
+          (n', While <$> genExp n' <*> genBlock n'),
+          (n', FunctionCallStatement <$> (Var <$> genName) <*> QC.vectorOf 3 (genExp n')),
+          (n', FunctionDef <$> genName <*> QC.vectorOf 3 genName <*> genBlock n'), -- TODO: make sure it always have return at the end
+          (n', Return <$> genExp n')
+        ]
   where
     n' = n `div` 2
 

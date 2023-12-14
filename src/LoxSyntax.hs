@@ -256,9 +256,8 @@ instance PP Expression where
       commaSep = foldr (<+>) (PP.text "") . intersperse (PP.text ",")
   pp (ArrayIndex e1 e2) = ppArrayName e1 <> PP.brackets (pp e2)
     where
-      parens d = PP.text "(" <> d <> PP.text ")"
       ppArrayName (Var v) = PP.text v
-      ppArrayName e1 = parens (pp e1)
+      ppArrayName e1 = PP.parens (pp e1)
   pp (ArrayCons es) = PP.brackets (commaSep (map pp es))
     where
       commaSep = foldr (<+>) (PP.text "") . intersperse (PP.text ",")
@@ -273,31 +272,27 @@ ppSS ss = PP.vcat (map pp ss)
 instance PP Statement where
   pp (Assign x e) = pp x <+> PP.equals <+> pp e
   pp (If guard b1 b2) =
-    PP.hang (PP.text "if" <+> parens (pp guard) <+> PP.text "{") 2 (pp b1)
+    PP.hang (PP.text "if" <+> PP.parens (pp guard) <+> PP.text "{") 2 (pp b1)
       PP.$$ PP.nest 2 (PP.text "} else {" PP.$$ pp b2)
       PP.$$ PP.text "}"
-    where
-      parens d = PP.text "(" <> d <> PP.text ")"
   pp (While guard e) =
-    PP.hang (PP.text "while" <+> parens (pp guard) <+> PP.text "{") 2 (pp e)
+    PP.hang (PP.text "while" <+> PP.parens (pp guard) <+> PP.text "{") 2 (pp e)
       PP.$+$ PP.text "}"
-    where
-      parens d = PP.text "(" <> d <> PP.text ")"
   pp (Return x) = PP.text "return" <+> pp x
   pp Empty = PP.semi
   pp EndStatement = PP.semi
   pp (VarDecl x e) = PP.text "var" <+> pp x <+> PP.equals <+> pp e
-  pp (FunctionCallStatement name args) = pp name <+> parens (commaSep (map pp args))
+  pp (FunctionCallStatement name args) = ppFuncName name <+> PP.parens (commaSep (map pp args))
     where
-      parens d = PP.text "(" <> d <> PP.text ")"
-      commaSep = foldr (<+>) (PP.text "") . intersperse (PP.text ",") -- Use <+>
+      commaSep = foldr (<+>) (PP.text "") . intersperse (PP.text ",")
+      ppFuncName (Var v) = PP.text v
+      ppFuncName e1 = PP.parens (pp e1)
   pp (FunctionDef name params block) =
-    PP.hang (PP.text "func" <+> pp name <+> parens (commaSep (map pp params)) <+> PP.text "{") 2 (PP.nest 4 (pp block)) <+> PP.text "}"
+    PP.hang (PP.text "fun" <+> pp name <+> PP.parens (commaSep (map pp params)) <+> PP.text "{") 2 (PP.nest 4 (pp block)) <+> PP.text "}"
     where
-      parens d = PP.text "(" <> d <> PP.text ")"
       commaSep = foldr (<+>) (PP.text "") . intersperse (PP.text ",")
   pp (For s1 e s2 b) =
-    PP.hang (PP.text "for" <+> pp s1 <+> PP.semi <+> pp e <+> PP.semi <+> pp s2 <+> PP.text "{") 2 (pp b)
+    PP.hang (PP.text "for" <+> PP.parens (pp s1 <+> PP.semi <+> pp e <+> PP.semi <+> pp s2) <+> PP.text "{") 2 (pp b)
       PP.$+$ PP.text "}"
 
 instance (PP a) => PP (Map Value a) where
