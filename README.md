@@ -40,7 +40,7 @@ The source code into three separate places:
     - [LoxSyntax.hs](src/LoxSyntax.hs) provides the types for the Lox syntax as well as pretty printing. 
     - The main parsing logic is implemented under [LoxParser.hs](src/LoxParser.hs) that uses [ParserLib.hs](src/ParserLib.hs), a applicative-based parsing library. 
     - [LoxStepper.hs](src/LoxStepper.hs) contains our evaluation that takes in an AST of a lox program intepetered by the parser. It uses the [State.hs](src/State.hs), a simplified generic version of state-transformer, for state management
-    - [LoxArbitrary.hs] generates random values of types. It is  used to generate a random Lox program used for property-based testing.
+    - [LoxArbitrary.hs](src/LoxArbitrary.hs) generates random values of types. It is  used to generate a random Lox program used for property-based testing.
 
   - The entry point for our executable is in [Main.hs](app/Main.hs). We provide a CLI tool that steps through a Lox program.
   
