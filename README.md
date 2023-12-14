@@ -28,6 +28,7 @@ You can run the main executable with `stack run`. This starts a CLI that steps t
 - `:r` to run current block to completion
 - `:d` to dump the store
 
+#### Testing
 You can run the tests with `stack test`. Finally, you can start a REPL with `stack ghci`.
 
 ## Module organization
