@@ -125,16 +125,10 @@ level Ne = 5
 level And = 4
 level Or = 3
 
--- abs.lox
+-- 1_abs.lox
 loxAbs :: Block
 loxAbs =
-  Block
-    [ VarDecl "x" (Op2 (Val (IntVal 0)) Minus (Val (IntVal 3))),
-      If
-        (Op2 (Var "x") Lt (Val (IntVal 0)))
-        (Block [Assign (LName "x") (Op2 (Val (IntVal 0)) Minus (Var "x"))])
-        (Block [])
-    ]
+  Block [VarDecl "x" (Op2 (Val (IntVal 0)) Minus (Val (IntVal 3))), If (Op2 (Var "x") Lt (Val (IntVal 0))) (Block [Assign (LName "x") (Op2 (Val (IntVal 0)) Minus (Var "x"))]) (Block [])]
 
 -- exp.lox
 loxExp :: Block

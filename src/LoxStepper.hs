@@ -7,12 +7,14 @@ import Data.List qualified as List
 import Data.Map (Map, (!?))
 import Data.Map qualified as Map
 import Data.Maybe (fromMaybe, isJust, isNothing)
+import GHC.IO.Handle (hFlush)
 import LoxParser
 import LoxSyntax
 import ParserLib (Parser)
 import ParserLib qualified as P
 import State (State)
 import State qualified as S
+import System.IO (stdout)
 import Test.HUnit (Assertion, Counts, Test (..), assert, runTestTT, (~:), (~?=))
 import Test.QuickCheck qualified as QC
 import Text.PrettyPrint (Doc, (<+>))
@@ -273,7 +275,7 @@ evalE (ArrayIndex e1 e2) = do
     StringVal s -> index (globalTableName, LArrayIndex (LName s) e2)
     _ -> case e1 of
       Var nm -> index (globalTableName, LArrayIndex (LName nm) e2)
-      _ -> return (ErrorVal  "Not an array")
+      _ -> return (ErrorVal "Not an array")
 
 toBool :: Value -> Bool
 toBool (BoolVal False) = False
@@ -451,7 +453,7 @@ stepper = go initialStepper
     go :: Stepper -> IO ()
     go ss = do
       prompt ss
-      putStr (fromMaybe "Lox" (filename ss) ++ "> ")
+      putStr (fromMaybe "Lox" (filename ss) ++ "> ") *> hFlush stdout
       str <- getLine
       case List.uncons (words str) of
         -- load a file for stepping
