@@ -174,7 +174,7 @@ funcCallStatP = convertToStat <$> funcCallExpP expP
   where
     convertToStat :: Expression -> Statement
     convertToStat (FunctionCall e es) = FunctionCallStatement e es
-    convertToStat _ = error "Err: convertToStatement should only be called on FunctionCall"
+    convertToStat _ = Empty
 
 -- fun f(x1, ..., xn) { s }
 funcDefP :: Parser Statement

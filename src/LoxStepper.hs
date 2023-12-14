@@ -333,6 +333,22 @@ evalS (FunctionCallStatement name args) = do
 evalS EndStatement = do
   exitScope
   return NilVal
+evalS (If es b1 b2) = do
+  v <- evalE es
+  case v of
+    ErrorVal s -> return $ ErrorVal s
+    _ -> do
+      defaultEnterScope
+      x <-
+        ( if toBool v
+            then eval b1
+            else eval b2
+          )
+      exitScope
+      return x
+evalS (For ss1 e1 ss2 (Block b1)) =
+  let s1 = Block [ss1, While e1 (Block (b1 ++ [ss2]))]
+   in eval s1
 evalS _ = return NilVal
 
 -- evaluate a block to completion

@@ -1,0 +1,13 @@
+fun addSub(x) {
+	fun add(x) {
+		return x + 1
+	}
+
+	fun sub(x) {
+		return x - 1
+	}
+
+	return sub(add(x))
+}
+
+var x = addSub(1) + addSub(1) // 2
