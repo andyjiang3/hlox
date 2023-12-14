@@ -216,7 +216,7 @@ instance PP Value where
   pp (ArrayVal vs) = PP.brackets (commaSep (map pp vs))
     where
       commaSep = foldr (<+>) (PP.text "") . intersperse (PP.text ",")
-  pp _ = undefined
+  pp (ErrorVal e) = PP.text e
 
 isBase :: Expression -> Bool
 isBase Val {} = True

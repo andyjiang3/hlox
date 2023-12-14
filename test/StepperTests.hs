@@ -12,12 +12,12 @@ import LoxStepper
 import LoxSyntax
   ( Block (Block),
     Bop (Divide, Eq, Gt, Minus, Modulo, Plus, Times),
-    Expression (FunctionCall, Op1, Op2, Val, Var),
-    LValue (LName),
+    Expression (FunctionCall, Op1, Op2, Val, Var, ArrayIndex),
+    LValue (LName, LArrayIndex),
     Name,
     Statement (Assign, Return),
     Uop (Neg, Not),
-    Value (BoolVal, FunctionVal, IntVal, NilVal, StringVal),
+    Value (BoolVal, FunctionVal, IntVal, NilVal, StringVal, ArrayVal, ErrorVal),
     loxAbs,
     loxAdvFunc,
     loxExp,
@@ -34,11 +34,11 @@ env1 =
         Map.fromList
           [ ( globalTableName,
               Map.fromList
-                [(StringVal "x", IntVal 3)]
+                [( "x", IntVal 3)]
             ),
             ( "_t1",
               Map.fromList
-                [ (StringVal "y", BoolVal True)
+                [ ( "y", BoolVal True)
                 ]
             )
           ],
@@ -52,15 +52,34 @@ env2 =
         Map.fromList
           [ ( globalTableName,
               Map.fromList
-                [(StringVal "z", IntVal 3)]
+                [( "z", IntVal 3)]
             ),
             ( "_t2",
               Map.fromList
-                [ (IntVal 4, BoolVal True)
+                [ ( "4", BoolVal True)
                 ]
             )
           ],
       parent = Just 0
+    }
+
+
+env3 :: Environment
+env3 =
+  Env
+    { memory =
+        Map.fromList
+          [ ( globalTableName,
+              Map.fromList
+                [( "y", IntVal 3), ( "x", ArrayVal [IntVal 1, IntVal 2, IntVal 3])]
+            ),
+            ( "_t1",
+              Map.fromList
+                [ ( "y", BoolVal True)
+                ]
+            )
+          ],
+      parent = Nothing
     }
 
 envs1 :: Environments
@@ -68,9 +87,13 @@ envs1 = Map.fromList [(0, env1)]
 
 envs2 = Map.fromList [(0, env1), (1, env2)]
 
+envs3 :: Environments
+envs3 = Map.fromList [(0, env3)]
+
 stack1 = Stk {curr = 0, par = Nothing}
 
 stack2 = Stk {curr = 0, par = Just stack1}
+
 
 extendedStore :: Store
 extendedStore =
@@ -104,11 +127,11 @@ functionEnv =
         Map.fromList
           [ ( globalTableName,
               Map.fromList
-                [(StringVal "x", IntVal 3), (StringVal "f", functionVal)]
+                [( "x", IntVal 3), ( "f", functionVal)]
             ),
             ( "_t1",
               Map.fromList
-                [ (StringVal "y", BoolVal True)
+                [ ( "y", BoolVal True)
                 ]
             )
           ],
@@ -127,31 +150,41 @@ functionStore =
     }
 
 xref :: Reference
-xref = ("_G", StringVal "x")
+xref = ("_G", LName "x")
 
 yref :: Reference
-yref = ("_t1", StringVal "y")
+yref = ("_t1", LName "y")
 
 zref :: Reference
-zref = ("_t2", IntVal 4)
+zref = ("_t2", LName "4")
 
 wref :: Reference
-wref = ("_t1", IntVal 0)
+wref = ("_t1", LName "0")
+
+arrayRef :: Reference
+arrayRef = ("_G", LArrayIndex (LName "x")  $ Val (IntVal 2))
+
+
+arrayStore :: Store
+arrayStore =
+  St
+    { environment = 0,
+      environments = envs3,
+      stack = stack1
+    }
 
 test_index :: Test
 test_index =
   "index tests"
     ~: TestList
-      [ S.evalState (index xref) initialStore ~?= NilVal,
+      [ S.evalState (index xref) initialStore ~?= ErrorVal "Cannot find value",
         S.evalState (index xref) extendedStore ~?= IntVal 3,
-        S.evalState (index yref) initialStore ~?= NilVal,
+        S.evalState (index yref) initialStore ~?= ErrorVal "Cannot find value",
         S.evalState (index yref) extendedStore ~?= BoolVal True,
-        S.execState (update ("_t1", NilVal) (IntVal 3)) extendedStore ~?= extendedStore,
-        S.evalState (index yref) extendedStore2 ~?= BoolVal True
+        S.evalState (index yref) extendedStore2 ~?= BoolVal True,
+        S.evalState (index arrayRef) arrayStore ~?= IntVal 3
       ]
 
--- >>> runTestTT test_index
--- Counts {cases = 5, tried = 5, errors = 0, failures = 1}
 
 tref :: (String, Value)
 tref = ("_G", StringVal "x")
@@ -180,7 +213,7 @@ storeTests :: Test
 storeTests = TestList [test_index, test_update, test_allocate]
 
 -- >>>runTestTT storeTests
--- Counts {cases = 6, tried = 6, errors = 0, failures = 0}
+-- Counts {cases = 14, tried = 14, errors = 0, failures = 2}
 
 test_evaluate_unops :: Test
 test_evaluate_unops =
@@ -259,26 +292,26 @@ expectedStoreFunc =
                     Map.fromList
                       [ ( "_G",
                           Map.fromList
-                            [ (StringVal "t", FunctionVal ["z"] (Block [Assign (LName "x") (Op2 (Var "x") Plus (Val (IntVal 1))), Return (Var "z")]) 0),
-                              (StringVal "x", IntVal 2),
-                              (StringVal "y", IntVal 2),
-                              (StringVal "z", IntVal 2)
+                            [ ( "t", FunctionVal ["z"] (Block [Assign (LName "x") (Op2 (Var "x") Plus (Val (IntVal 1))), Return (Var "z")]) 0),
+                              ( "x", IntVal 2),
+                              ( "y", IntVal 2),
+                              ( "z", IntVal 2)
                             ]
                         )
                       ],
                   parent = Nothing
                 }
             ),
-            (1, Env {memory = Map.fromList [("_G", Map.fromList [(StringVal "z", IntVal 2)])], parent = Just 0})
+            (1, Env {memory = Map.fromList [("_G", Map.fromList [( "z", IntVal 2)])], parent = Just 0})
           ],
       stack = Stk {curr = 0, par = Nothing}
     }
 
 expectedLoxExp :: Store
-expectedLoxExp = St {environment = 0, environments = Map.fromList [(0, Env {memory = Map.fromList [("_G", Map.fromList [(StringVal "x1", IntVal 4), (StringVal "x2", NilVal), (StringVal "x3", NilVal), (StringVal "x4", NilVal), (StringVal "x5", BoolVal True), (StringVal "x6", BoolVal False), (StringVal "x7", BoolVal False)])], parent = Nothing})], stack = Stk {curr = 0, par = Nothing}}
+expectedLoxExp = St {environment = 0, environments = Map.fromList [(0, Env {memory = Map.fromList [("_G", Map.fromList [( "x1", IntVal 4), ( "x2", NilVal), ( "x3", NilVal), ( "x4", NilVal), ( "x5", BoolVal True), ( "x6", BoolVal False), ( "x7", BoolVal False)])], parent = Nothing})], stack = Stk {curr = 0, par = Nothing}}
 
 expectedStoreAbs :: Store
-expectedStoreAbs = St {environment = 0, environments = Map.fromList [(0, Env {memory = Map.fromList [("_G", Map.fromList [(StringVal "x", IntVal 3)])], parent = Nothing}), (1, Env {memory = Map.fromList [("_G", Map.empty)], parent = Just 0})], stack = Stk {curr = 0, par = Nothing}}
+expectedStoreAbs = St {environment = 0, environments = Map.fromList [(0, Env {memory = Map.fromList [("_G", Map.fromList [( "x", IntVal 3)])], parent = Nothing}), (1, Env {memory = Map.fromList [("_G", Map.empty)], parent = Just 0})], stack = Stk {curr = 0, par = Nothing}}
 
 -- tExecStepFunc :: Test
 -- tExecStepFunc =
