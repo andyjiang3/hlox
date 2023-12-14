@@ -163,6 +163,20 @@ loxAdvFunc =
       VarDecl "z" (FunctionCall (Var "t") [Var "y"])
     ]
 
+
+loxScope :: Block 
+loxScope = Block [VarDecl "x" (Val (IntVal 0)), VarDecl "y" (Val (IntVal 0)), If (Val (BoolVal True)) (Block [VarDecl "x" (Val (IntVal 10)), Assign (LName "y") (Val (IntVal 10))]) (Block []), VarDecl "z" (Op2 (Op2 (Val (IntVal 12)) Times (Val (IntVal 3))) Plus (Val (IntVal 4)))]
+
+loxAnonFunc :: Block
+loxAnonFunc = Block [FunctionDef "test" ["a", "b"] (Block [Return (FunctionCall (Var "a") [Var "b"])]), VarDecl "x" (FunctionCall (Var "test") [Val (FunctionValIncomplete ["y"] (Block [Return (Op2 (Var "y") Plus (Val (IntVal 1)))])), Val (IntVal 1)])]
+
+loxClosure :: Block
+loxClosure = Block [VarDecl "outside" (Val (IntVal 7)), FunctionDef "f2" [] (Block [Return (Var "outside")]), FunctionDef "outer" [] (Block [VarDecl "outside" (Val (IntVal 5)), FunctionDef "inner" [] (Block [Assign (LName "outside") (Op2 (Var "outside") Plus (Val (IntVal 1))), Return (Var "outside")]), Return (Var "inner")]), VarDecl "t" (FunctionCall (Var "outer") []), VarDecl "x" (FunctionCall (Var "t") []), Empty]
+
+loxArrayB :: Block
+loxArrayB = Block [VarDecl "x" (ArrayCons [Val (IntVal 1), Val (IntVal 2), Val (IntVal 3)]), Assign (LArrayIndex (LName "x") (Val (IntVal 1))) (Val (IntVal 0)), VarDecl "y" (Op2 (ArrayIndex (Var "x") (Val (IntVal 1))) Plus (ArrayIndex (Var "x") (Val (IntVal 2)))), VarDecl "z" (ArrayCons [ArrayCons [Val (IntVal 1), Val (IntVal 2)], ArrayCons [Val (IntVal 2), Val (IntVal 3)]]), Assign (LArrayIndex (LArrayIndex (LName "z") (Val (IntVal 0))) (Val (IntVal 1))) (Val (IntVal 4))]
+
+
 type Id = Int
 
 class PP a where

@@ -308,8 +308,28 @@ tExecStepAbs =
     ~: execStep loxAbs initialStore
     ~?= Right expectedStoreAbs
 
+tExecScope :: Test
+tExecStepAbs =
+  "execStep exp"
+    ~: execStep loxScope initialStore
+    ~?= Right expectedStoreAbs
+
+
+tExecAnonFunc :: Test
+tExecStepAbs =
+  "execStep exp"
+    ~: execStep loxAnonFunc initialStore
+    ~?= Right expectedStoreAbs
+
+tExecClosure:: Test
+tExecStepAbs =
+  "execStep exp"
+    ~: execStep loxClosure initialStore
+    ~?= Right expectedStoreAbs
+
+
 test_execStep :: Test
-test_execStep = TestList [tExecStepFunc, tExecStepAbs, tExecStepExp]
+test_execStep = TestList [tExecStepFunc, tExecStepAbs, tExecStepExp, tExecScope, tExecAnonFunc, tExecClosure]
 
 -- >>> runTestTT test_execStep
 -- Counts {cases = 3, tried = 3, errors = 0, failures = 0}
