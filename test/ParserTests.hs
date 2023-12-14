@@ -1,3 +1,6 @@
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+
+{-# HLINT ignore "Use camelCase" #-}
 module ParserTests where
 
 import Control.Applicative
@@ -153,8 +156,8 @@ prop_roundtrip_exp e = P.parse expP (pretty e) == Right e
 prop_roundtrip_stat :: Statement -> Bool
 prop_roundtrip_stat s = P.parse statementP (pretty s) == Right s
 
-roundtripQc :: IO ()
-roundtripQc = do
+roundtrip_qc :: IO ()
+roundtrip_qc = do
   putStrLn "roundtrip_val"
   QC.quickCheck prop_roundtrip_val
   putStrLn "roundtrip_exp"
