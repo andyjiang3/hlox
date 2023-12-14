@@ -47,6 +47,15 @@ test_funcValP =
       P.parse (many funcValP) "\\(x1, x2) { y=4 } \\(x1, x2) { y=4 }" ~?= Right [FunctionValIncomplete ["x1", "x2"] (Block [Assign (LName "y") (Val (IntVal 4))]), FunctionValIncomplete ["x1", "x2"] (Block [Assign (LName "y") (Val (IntVal 4))])]
     ]
 
+test_arrayValP :: Test
+test_arrayValP =
+  TestList
+    [ P.parse arrayValP "[1, 2, 3]" ~?= Right (ArrayVal [IntVal 1, IntVal 2, IntVal 3]),
+      P.parse arrayValP "[\"a\", \"b\", \"c\"]" ~?= Right (ArrayVal [StringVal "a", StringVal "b", StringVal "c"]),
+      P.parse arrayValP "[]" ~?= Right (ArrayVal []),
+      P.parse (many arrayValP) "[1, 2, 3] [1, 2, 3]" ~?= Right [ArrayVal [IntVal 1, IntVal 2, IntVal 3], ArrayVal [IntVal 1, IntVal 2, IntVal 3]]
+    ]
+
 tParseFiles :: Test
 tParseFiles =
   "parse files"
@@ -100,7 +109,10 @@ test_exp =
         P.parse (many bopP) "+ >= test" ~?= Right [Plus, Ge],
         P.parse (many bopP) "+ - * / % or and == != > >= < <=" ~?= Right [Plus, Minus, Times, Divide, Modulo, Or, And, Eq, Ne, Gt, Ge, Lt, Le],
         P.parse (funcCallExpP expP) "f(a1)" ~?= Right (FunctionCall (Var "f") [Var "a1"]),
-        P.parse (funcCallExpP expP) "f(a1, a2)" ~?= Right (FunctionCall (Var "f") [Var "a1", Var "a2"])
+        P.parse (funcCallExpP expP) "f(a1, a2)" ~?= Right (FunctionCall (Var "f") [Var "a1", Var "a2"]),
+        P.parse arrayConsP "[1, 2, 3]" ~?= Right (ArrayCons [Val (IntVal 1), Val (IntVal 2), Val (IntVal 3)]),
+        P.parse (arrayIndexExpP expP) "x[1]" ~?= Right (ArrayIndex (Var "x") (Val (IntVal 1))),
+        P.parse (many arrayConsP) "[1, 2, 3] [4, 5, 6]" ~?= Right [ArrayCons [Val (IntVal 1), Val (IntVal 2), Val (IntVal 3)], ArrayCons [Val (IntVal 4), Val (IntVal 5), Val (IntVal 6)]]
       ]
 
 test_stat =
@@ -109,6 +121,9 @@ test_stat =
       [ P.parse statementP ";" ~?= Right Empty,
         P.parse statementP "y=4" ~?= Right (Assign (LName "y") (Val (IntVal 4))),
         P.parse statementP "var x=3" ~?= Right (VarDecl "x" (Val (IntVal 3))),
+        P.parse statementP "x[1] = 3" ~?= Right (Assign (LArrayIndex (LName "x") (Val (IntVal 1))) (Val (IntVal 3))),
+        P.parse statementP "x[1][2] = 2" ~?= Right (Assign (LArrayIndex (LArrayIndex (LName "x") (Val (IntVal 1))) (Val (IntVal 2))) (Val (IntVal 2))),
+        P.parse statementP "var x = [1, 2, 3]" ~?= Right (VarDecl "x" (ArrayCons [Val (IntVal 1), Val (IntVal 2), Val (IntVal 3)])),
         P.parse statementP "if (x) { y=4 } else { y=5 }" ~?= Right (If (Var "x") (Block [Assign (LName "y") (Val (IntVal 4))]) (Block [Assign (LName "y") (Val (IntVal 5))])),
         P.parse statementP "for (var x=3; x<6; x=x+1) { y=4 }" ~?= Right (For (VarDecl "x" (Val (IntVal 3))) (Op2 (Var "x") Lt (Val (IntVal 6))) (Assign (LName "x") (Op2 (Var "x") Plus (Val (IntVal 1)))) (Block [Assign (LName "y") (Val (IntVal 4))])),
         P.parse statementP "while (x) { y=4 }" ~?= Right (While (Var "x") (Block [Assign (LName "y") (Val (IntVal 4))])),
@@ -119,10 +134,10 @@ test_stat =
       ]
 
 test_all :: IO Counts
-test_all = runTestTT $ TestList [test_comb, test_value, test_exp, test_stat, tParseFiles]
+test_all = runTestTT $ TestList [test_wsP, test_stringP, test_constP, test_stringValP, test_funcValP, test_arrayValP, test_comb, test_value, test_exp, test_stat, tParseFiles]
 
 -- >>> test_all
--- Counts {cases = 39, tried = 39, errors = 0, failures = 1}
+-- Counts {cases = 62, tried = 62, errors = 0, failures = 3}
 
 -- prop_roundtrip_val :: Value -> Bool
 -- prop_roundtrip_val v = P.parse valueP (pretty v) == Right v

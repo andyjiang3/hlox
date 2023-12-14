@@ -1,4 +1,4 @@
-module LoxParser where 
+module LoxParser where
 
 import Control.Applicative
 import Data.Char qualified as Char
@@ -44,6 +44,9 @@ nilValP = constP "nil" NilVal
 stringValP :: Parser Value
 stringValP = StringVal <$> wsP (P.between (P.string "\"") (many (P.satisfy (/= '"'))) (P.string "\""))
 
+arrayValP :: Parser Value
+arrayValP = ArrayVal <$> brackets (P.sepBy valueP (stringP ","))
+
 funcValP :: Parser Value
 funcValP = FunctionValIncomplete <$> (stringP "\\" *> parens (P.sepBy varP (stringP ","))) <*> braces blockP
 
@@ -63,7 +66,8 @@ expP = orP
       baseP
         <|> Op1 <$> uopP <*> uopexpP
     baseP =
-      parens expP -- Supports Grouping in Lox -- TODO: support array
+      arrayConsP
+        <|> parens expP -- Supports Grouping in Lox
         <|> Var <$> varP
         <|> Val <$> valueP
 
@@ -124,6 +128,9 @@ arrayIndexExpP p = process <$> first <*> rest
 
     rest :: Parser [Expression]
     rest = many $ brackets expP
+
+arrayConsP :: Parser Expression
+arrayConsP = ArrayCons <$> brackets (P.sepBy expP (stringP ","))
 
 -- Statement parser --
 statementP :: Parser Statement

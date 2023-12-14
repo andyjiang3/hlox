@@ -2,8 +2,8 @@ module LoxSyntax where
 
 import Control.Monad (mapM_)
 import Data.Char qualified as Char
-import Data.Map (Map)
 import Data.List (intersperse)
+import Data.Map (Map)
 import Data.Map qualified as Map
 import Test.HUnit
 import Test.QuickCheck (Arbitrary (..), Gen)
@@ -29,7 +29,7 @@ data Statement
   | If Expression Block Block -- if (e) { s1 } else { s2 }
   | While Expression Block -- while (e) { s }
   | For Statement Expression Statement Block -- for (var x = e; e; e) { s }
-  | FunctionCallStatement Expression [Expression] -- f(e1, ..., en), TODO: Name instead of expresssion?
+  | FunctionCallStatement Expression [Expression] -- f(e1, ..., en)
   | FunctionDef Name [Name] Block -- fun f(x1, ..., xn) { s }
   | Return Expression -- return e
   | Print Expression -- print e
@@ -59,16 +59,15 @@ data Value -- literals
   | BoolVal Bool -- false, true
   | StringVal String -- "abd"
   | ArrayVal [Value] -- [v1, ..., vn]
-  | FunctionValIncomplete [Name] Block
+  | FunctionValIncomplete [Name] Block -- for internal use only
   | ErrorVal String -- raise an error
-  | FunctionVal [Name] Block Id-- \(x1, ..., xn) { s }, supports anonymous function
+  | FunctionVal [Name] Block Id -- \(x1, ..., xn) { s }, supports anonymous function
   deriving
     ( Eq,
       Show,
       Ord
     )
 
--- | FunctionVal [Name] Block -- function (x1, ..., xn) s end, todo: constraint name more?
 data Uop
   = Neg -- `-` :: Int -> Int
   | Not -- `!` :: a -> Bool
@@ -178,9 +177,7 @@ loxAdvFunc =
       VarDecl "z" (FunctionCall (Var "t") [Var "y"])
     ]
 
-
 type Id = Int
-
 
 class PP a where
   pp :: a -> Doc
