@@ -11,7 +11,7 @@ import Test.QuickCheck qualified as QC
 
 -- Helper functions --
 wsP :: Parser a -> Parser a
-wsP p = p <* many P.space
+wsP p = p <* many P.space --da
 
 stringP :: String -> Parser ()
 stringP s = wsP (P.string s) *> pure ()

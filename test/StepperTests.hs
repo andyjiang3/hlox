@@ -15,12 +15,12 @@ import LoxSyntax
     Expression (FunctionCall, Op1, Op2, Val, Var, ArrayIndex),
     LValue (LName, LArrayIndex),
     Name,
-    Statement (Assign, Return),
+    Statement (Assign, Return, VarDecl, FunctionDef, FunctionCallStatement ),
     Uop (Neg, Not),
     Value (BoolVal, FunctionVal, IntVal, NilVal, StringVal, ArrayVal, FunctionValIncomplete, FunctionVal, ErrorVal),
     loxAbs,
     loxAdvFunc,
-    loxExp,
+    loxExp, loxScope, loxAnonFunc, loxClosure, loxArrayB
   )
 import State (State)
 import State qualified as S
@@ -285,10 +285,23 @@ expectedStoreFunc =
   St {environment = 0, environments =Map.fromList [(0, Env {memory =Map.fromList [("_G",Map.fromList [("t", FunctionVal ["z"] (Block [Assign (LName "x") (Op2 (Var "x") Plus (Val (IntVal 1))), Return (Var "z")]) 0), ("x", IntVal 2), ("y", IntVal 2), ("z", IntVal 2)])], parent = Nothing}), (1, Env {memory =Map.fromList [("_G",Map.fromList [("z", IntVal 2)])], parent = Just 0})], stack = Stk {curr = 0, par = Nothing}}
 
 expectedLoxExp :: Store
-expectedLoxExp = St {environment = 0, environments =Map.fromList [(0, Env {memory =Map.fromList [("_G",Map.fromList [("x1", IntVal 4), ("x2", ErrorVal "Binary operation on invalid types"), ("x3", NilVal), ("x4", ErrorVal "Binary operation on invalid types"), ("x5", BoolVal True), ("x6", BoolVal False), ("x7", BoolVal False)])], parent = Nothing})], stack = Stk {curr = 0, par = Nothing}}
+expectedLoxExp = St {environment = 0, environments = Map.fromList [(0, Env {memory =Map.fromList [("_G",Map.fromList [("x1", IntVal 4), ("x2", ErrorVal "Binary operation on invalid types"), ("x3", NilVal), ("x4", ErrorVal "Binary operation on invalid types"), ("x5", BoolVal True), ("x6", BoolVal False), ("x7", BoolVal False)])], parent = Nothing})], stack = Stk {curr = 0, par = Nothing}}
 
 expectedStoreAbs :: Store
-expectedStoreAbs = St {environment = 0, environments =Map.fromList [(0, Env {memory =Map.fromList [("_G",Map.fromList [("x", IntVal 3)])], parent = Nothing}), (1, Env {memory =Map.fromList [("_G",Map.empty)], parent = Just 0})], stack = Stk {curr = 0, par = Nothing}}
+expectedStoreAbs = St {environment = 0, environments = Map.fromList [(0, Env {memory =Map.fromList [("_G",Map.fromList [("x", IntVal 3)])], parent = Nothing}), (1, Env {memory =Map.fromList [("_G",Map.empty)], parent = Just 0})], stack = Stk {curr = 0, par = Nothing}}
+
+expectedStoreScope :: Store
+expectedStoreScope = St {environment = 0, environments = Map.fromList [(0, Env {memory =Map.fromList [("_G",Map.fromList [("x", IntVal 0), ("y", IntVal 10), ("z", IntVal 40)])], parent = Nothing}), (1, Env {memory =Map.fromList [("_G",Map.fromList [("x", IntVal 10)])], parent = Just 0})], stack = Stk {curr = 0, par = Nothing}}
+
+expectedStoreAnon :: Store
+expectedStoreAnon =  St {environment = 0, environments =Map.fromList [(0, Env {memory =Map.fromList [("_G",Map.fromList [("test", FunctionVal ["a", "b"] (Block [Return (FunctionCall (Var "a") [Var "b"])]) 0), ("x", IntVal 2)])], parent = Nothing}), (1, Env {memory =Map.fromList [("_G",Map.fromList [("a", FunctionVal ["y"] (Block [Return (Op2 (Var "y") Plus (Val (IntVal 1)))]) 1), ("b", IntVal 1)])], parent = Just 0}), (2, Env {memory =Map.fromList [("_G",Map.fromList [("y", IntVal 1)])], parent = Just 1})], stack = Stk {curr = 0, par = Nothing}}
+
+expectedStoreClosure :: Store
+expectedStoreClosure = St {environment = 0, environments =Map.fromList [(0, Env {memory =Map.fromList [("_G",Map.fromList [("f2", FunctionVal [] (Block [Return (Var "outside")]) 0), ("outer", FunctionVal [] (Block [VarDecl "outside" (Val (IntVal 5)), FunctionDef "inner" [] (Block [Assign (LName "outside") (Op2 (Var "outside") Plus (Val (IntVal 1))), Return (Var "outside")]), Return (Var "inner")]) 0), ("outside", IntVal 7), ("t", FunctionVal [] (Block [Assign (LName "outside") (Op2 (Var "outside") Plus (Val (IntVal 1))), Return (Var "outside")]) 1), ("x", IntVal 6)])], parent = Nothing}), (1, Env {memory =Map.fromList [("_G",Map.fromList [("inner", FunctionVal [] (Block [Assign (LName "outside") (Op2 (Var "outside") Plus (Val (IntVal 1))), Return (Var "outside")]) 1), ("outside", IntVal 6)])], parent = Just 0}), (2, Env {memory =Map.fromList [("_G",Map.fromList [])], parent = Just 1})], stack = Stk {curr = 0, par = Nothing}}
+
+expectedStoreArray :: Store
+expectedStoreArray = St {environment = 0, environments =Map.fromList [(0, Env {memory =Map.fromList [("_G",Map.fromList [("x", ArrayVal [IntVal 1, IntVal 0, IntVal 3]), ("y", IntVal 3), ("z", ArrayVal [ArrayVal [IntVal 1, IntVal 4], ArrayVal [IntVal 2, IntVal 3]])])], parent = Nothing})], stack = Stk {curr = 0, par = Nothing}}
+
 
 tExecStepFunc :: Test
 tExecStepFunc =
@@ -301,7 +314,7 @@ tExecStepExp =
   "execStep exp"
     ~: execStep loxExp initialStore
     ~?= Right expectedLoxExp
-
+ 
 tExecStepAbs :: Test
 tExecStepAbs =
   "execStep exp"
@@ -309,31 +322,37 @@ tExecStepAbs =
     ~?= Right expectedStoreAbs
 
 tExecScope :: Test
-tExecStepAbs =
+tExecScope =
   "execStep exp"
     ~: execStep loxScope initialStore
-    ~?= Right expectedStoreAbs
+    ~?= Right expectedStoreScope
 
 
 tExecAnonFunc :: Test
-tExecStepAbs =
+tExecAnonFunc =
   "execStep exp"
     ~: execStep loxAnonFunc initialStore
-    ~?= Right expectedStoreAbs
+    ~?= Right expectedStoreAnon
 
 tExecClosure:: Test
-tExecStepAbs =
+tExecClosure =
   "execStep exp"
     ~: execStep loxClosure initialStore
-    ~?= Right expectedStoreAbs
+    ~?= Right expectedStoreClosure
+
+
+tExecArray :: Test
+tExecArray =
+  "execStep exp"
+    ~: execStep loxArrayB initialStore
+    ~?= Right expectedStoreArray
 
 
 test_execStep :: Test
-test_execStep = TestList [tExecStepFunc, tExecStepAbs, tExecStepExp, tExecScope, tExecAnonFunc, tExecClosure]
+test_execStep = TestList [tExecStepFunc, tExecStepAbs, tExecStepExp, tExecScope, tExecAnonFunc, tExecClosure, tExecArray]
 
 -- >>> runTestTT test_execStep
 -- Counts {cases = 3, tried = 3, errors = 0, failures = 0}
-
 --- Propert based testing
 
 prop_evaluateNot :: Value -> Store -> Bool
