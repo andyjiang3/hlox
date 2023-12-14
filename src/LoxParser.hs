@@ -201,7 +201,5 @@ parseLoxStat = P.parse statementP
 parseLoxFile :: String -> IO (Either P.ParseError Block)
 parseLoxFile = P.parseFromFile (const <$> blockP <*> P.eof)
 
-
-
--- >>> parseLoxFile "test/programs/7_array.lox"
--- Right (Block [VarDecl "x" (ArrayCons [Val (IntVal 1),Val (IntVal 2),Val (IntVal 3)]),Assign (LArrayIndex (LName "x") (Val (IntVal 1))) (Val (IntVal 0)),VarDecl "y" (Op2 (ArrayIndex (Var "x") (Val (IntVal 1))) Plus (ArrayIndex (Var "x") (Val (IntVal 2)))),VarDecl "z" (ArrayCons [ArrayCons [Val (IntVal 1),Val (IntVal 2)],ArrayCons [Val (IntVal 2),Val (IntVal 3)]]),Assign (LArrayIndex (LArrayIndex (LName "z") (Val (IntVal 0))) (Val (IntVal 1))) (Val (IntVal 4))])
+-- >>> parseLoxFile "test/programs/10_recursion.lox"
+-- Right (Block [FunctionDef "fib" ["n"] (Block [If (Op2 (Var "n") Le (Val (IntVal 1))) (Block [Return (Var "n")]) (Block [Return (Op2 (FunctionCall (Var "fib") [Op2 (Var "n") Minus (Val (IntVal 1))]) Plus (FunctionCall (Var "fib") [Op2 (Var "n") Minus (Val (IntVal 2))]))])]),VarDecl "x" (FunctionCall (Var "fib") [Val (IntVal 5)])])
