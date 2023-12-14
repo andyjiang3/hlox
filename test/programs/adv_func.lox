@@ -1,9 +1,14 @@
-var x = 1
+var x = 1 // should be 2
 var y = 2
 
 fun t(z) {
-	x = x + 1 // x = 2
+	x = x + 1
 	return z + 6
 }
 
 var z = t(y) + 1 // should be 9
+
+// :l test/programs/adv_func.lox
+// :l test/programs/anon_func.lox
+// :l test/programs/scope.lox
+// :l test/programs/closure.lox

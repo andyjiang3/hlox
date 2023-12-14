@@ -33,6 +33,7 @@ data Stack = Stk {curr :: Id, par :: Maybe Stack} deriving (Eq, Show)
 -- Store holds current environment, stack the map of Environemnts
 data Store = St {environment :: Id, environments :: Environments, stack :: Stack} deriving (Eq, Show)
 
+
 instance PP Store where
   pp :: Store -> Doc
   pp (St e es _) = case Map.lookup e es of
@@ -134,8 +135,8 @@ functionPrologue exp names args id = do
 enterScope :: (Store -> Store) -> State Store ()
 enterScope f = do
   st <- S.get
-  let newStore = f st
-  S.put newStore
+  S.put $ f st
+
 
 defaultEnterScope :: State Store ()
 defaultEnterScope = do
@@ -299,10 +300,6 @@ boundedStep _ b = return b
 steps :: Int -> Block -> Store -> (Block, Store)
 steps n block = S.runState (boundedStep n block)
 
-prop_step_total :: Block -> Store -> Bool
-prop_step_total b s = case S.runState (step b) s of
-  (b', s') -> True
-
 -- test to see if a block has finished
 final :: Block -> Bool
 final (Block []) = True
@@ -312,13 +309,6 @@ final _ = False
 execStep :: Block -> Store -> Store
 execStep b | final b = id
 execStep b = uncurry execStep . steps 1 b
-
-prop_stepExec :: Block -> QC.Property
-prop_stepExec b =
-  not (final b) QC.==> final b1 QC.==> m1 == m2
-  where
-    (b1, m1) = S.runState (boundedStep 100 b) initialStore
-    m2 = exec b initialStore
 
 data Stepper = Stepper
   { filename :: Maybe String,

@@ -3,6 +3,7 @@ module LoxSyntax where
 import Control.Monad (mapM_)
 import Data.Char qualified as Char
 import Data.Map (Map)
+import Data.List (intersperse)
 import Data.Map qualified as Map
 import Test.HUnit
 import Test.QuickCheck (Arbitrary (..), Gen)
@@ -217,11 +218,11 @@ instance PP Value where
   pp (FunctionVal n blk _) = parens (commaSep (map pp n)) <+> PP.text "{" <+> pp blk <+> PP.text "}"
     where
       parens d = PP.text "(" <> d <> PP.text ")"
-      commaSep = foldr (\a b -> a <+> PP.text "," <+> b) (PP.text "")
+      commaSep = foldr (<+>) (PP.text "") . intersperse (PP.text ",")
   pp (FunctionValIncomplete n blk) = parens (commaSep (map pp n)) <+> PP.text "{" <+> pp blk <+> PP.text "}"
     where
       parens d = PP.text "(" <> d <> PP.text ")"
-      commaSep = foldr (\a b -> a <+> PP.text "," <+> b) (PP.text "")
+      commaSep = foldr (<+>) (PP.text "") . intersperse (PP.text ",")
   pp _ = undefined
 
 isBase :: Expression -> Bool
@@ -259,7 +260,7 @@ instance PP Expression where
   pp (FunctionCall name args) = pp name <+> parens (commaSep (map pp args))
     where
       parens d = PP.text "(" <> d <> PP.text ")"
-      commaSep = foldr (\a b -> a <+> PP.text "," <+> b) (PP.text "")
+      commaSep = foldr (<+>) (PP.text "") . intersperse (PP.text ",")
   pp _ = PP.text ""
 
 instance PP Block where
@@ -285,12 +286,12 @@ instance PP Statement where
   pp (FunctionCallStatement name args) = pp name <+> parens (commaSep (map pp args))
     where
       parens d = PP.text "(" <> d <> PP.text ")"
-      commaSep = foldr (\a b -> a <+> PP.text "," <+> b) (PP.text "") -- Use <+>
+      commaSep = foldr (<+>) (PP.text "") . intersperse (PP.text ",") -- Use <+>
   pp (FunctionDef name params block) =
     PP.hang (PP.text "func" <+> pp name <+> parens (commaSep (map pp params)) <+> PP.text "{") 2 (PP.nest 4 (pp block)) <+> PP.text "}"
     where
       parens d = PP.text "(" <> d <> PP.text ")"
-      commaSep = foldr (\a b -> a <+> PP.text "," <+> b) (PP.text "")
+      commaSep = foldr (<+>) (PP.text "") . intersperse (PP.text ",")
   pp _ = undefined
 
 instance (PP a) => PP (Map Value a) where

@@ -8,6 +8,7 @@ import Data.Map (Map, (!?))
 import Data.Map qualified as Map
 import Data.Maybe (fromMaybe, isJust, isNothing)
 import LoxStepper
+import LoxArbitrary
 import LoxSyntax
   ( Block (Block),
     Bop (Divide, Eq, Gt, Minus, Modulo, Plus, Times),
@@ -259,7 +260,7 @@ expectedLoxExp :: Store
 expectedLoxExp = St {environment = 0, environments = Map.fromList [(0, Env {memory = Map.fromList [("_G", Map.fromList [(StringVal "x1", IntVal 4), (StringVal "x2", NilVal), (StringVal "x3", NilVal), (StringVal "x4", NilVal), (StringVal "x5", BoolVal True), (StringVal "x6", BoolVal False), (StringVal "x7", BoolVal False)])], parent = Nothing})], stack = Stk {curr = 0, par = Nothing}}
 
 expectedStoreAbs :: Store
-expectedStoreAbs = St {environment = 0, environments = Map.fromList [(0, Env {memory = Map.fromList [("_G", Map.fromList [(StringVal "x", IntVal 3)])], parent = Nothing}), (1, Env {memory = Map.fromList [("_G", Map.fromList [])], parent = Just 0})], stack = Stk {curr = 0, par = Nothing}}
+expectedStoreAbs = St {environment = 0, environments = Map.fromList [(0, Env {memory = Map.fromList [("_G", Map.fromList [(StringVal "x", IntVal 3)])], parent = Nothing}), (1, Env {memory = Map.fromList [("_G", Map.empty)], parent = Just 0})], stack = Stk {curr = 0, par = Nothing}}
 
 tExecStepFunc :: Test
 tExecStepFunc =
@@ -284,3 +285,44 @@ test_execStep = TestList [tExecStepFunc, tExecStepAbs, tExecStepExp]
 
 -- -- -- >>> runTestTT test_execStep
 -- -- -- Counts {cases = 3, tried = 3, errors = 0, failures = 0}
+
+
+
+
+--- Propert based testing
+
+prop_evaluateNot :: Value -> Store -> Bool
+prop_evaluateNot v s = evaluate (Op1 Not (Val v)) s == BoolVal (not $ toBool v)
+
+
+prop_step_total :: Block -> Store -> Bool
+prop_step_total b s = case S.runState (step b) s of
+  (b', s') -> True
+
+prop_stepExec :: Block -> QC.Property
+prop_stepExec b =
+  not (final b) QC.==> final b1 QC.==> m1 == m2
+  where
+    (b1, m1) = S.runState (boundedStep 100 b) initialStore
+    m2 = exec b initialStore
+
+
+prop_evalE_total :: Expression -> Store -> Bool
+prop_evalE_total e s = case evaluate e s of
+  NilVal -> True
+  IntVal i -> i `seq` True
+  BoolVal b -> b `seq` True
+  StringVal s -> s `seq` True
+  _ -> undefined
+
+
+qc :: IO ()
+qc = do
+  putStrLn "evaluateNot"
+  quickCheckN 100 prop_evaluateNot
+  putStrLn "evalE_total"
+  quickCheckN 100 prop_evalE_total
+  putStrLn "step_total"
+  -- quickCheckN 100 prop_step_total
+  -- putStrLn "stepExec"
+  -- quickCheckN 100 prop_stepExec

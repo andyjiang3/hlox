@@ -1,4 +1,9 @@
 var outside = 7
+
+fun f2() {
+    return outside
+}
+
 fun outer() {
     var outside = 5
     fun inner () {
@@ -8,5 +13,21 @@ fun outer() {
     return inner
 }
 var t = outer()
-var x = t()
+var x = t() // 6
+var w = t() // 7
+var u = t() // 8
+var r = t() // 9
+
+var l = f2()
+
+
+// Global -> 0, parent = Nothing
+// Outer -> 1, parent = 0
+// inner -> 2, parent = 1
+
+
+
+// 0, Nothing
+// 1, 0
+// 0, Nothing
 
