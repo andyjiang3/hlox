@@ -21,7 +21,7 @@ import Text.PrettyPrint (Doc, (<+>))
 import Text.PrettyPrint qualified as PP
 import Text.Read (readMaybe)
 
-type Table = Map Name Value
+type Table = Map Name Value 
 
 type EitherBlock = Either String Block
 
@@ -39,7 +39,7 @@ data Stack = Stk {curr :: Id, par :: Maybe Stack} deriving (Eq, Show)
 -- Store holds current environment, stack the map of Environemnts
 data Store = St {environment :: Id, environments :: Environments, stack :: Stack} deriving (Eq, Show)
 
-instance PP Store where
+instance PP Store where 
   pp :: Store -> Doc
   pp (St e es _) = case Map.lookup e es of
     Nothing -> PP.text "empty"
@@ -190,7 +190,7 @@ allocate (table, LName name) val = do
           let newMemory = Map.insert table newTable (memory env)
           return $ store {environments = Map.insert (environment store) (env {memory = newMemory}) (environments store)}
   case newStore of
-    Nothing -> return (ErrorVal ("Multiple definitons. Variable " ++ pretty name ++ "already exists"))
+    Nothing -> return (ErrorVal ("Multiple definitons. Variable " ++ pretty name ++ " already exists"))
     Just ss -> do
       S.put ss
       return NilVal
@@ -201,18 +201,19 @@ resolve l = (globalTableName, l)
 functionPrologue :: Expression -> [Name] -> [Expression] -> Id -> State Store ()
 functionPrologue exp names args id = do
   st <- S.get
+  let resolvedArgs = let f2 arg = fst $ S.runState (evalE arg) st in map f2 args
   enterScope f
-  let pairs = zip names args
+  let pairs = zip names resolvedArgs
    in mapM_
         ( \(name, arg) ->
             let ref = resolve (LName name)
              in do
-                  val <- evalE arg
-                  allocate ref val
+                  allocate ref arg
         )
         pairs
   where
     f = functionEnterScope id
+
 
 enterScope :: (Store -> Store) -> State Store ()
 enterScope f = do
@@ -261,14 +262,14 @@ evalE (FunctionCall e es) = do
     FunctionVal names blk id -> do
       functionPrologue e names es id
       eval blk
-    _ -> return NilVal
+    _ -> return $ ErrorVal "Unknown Function"
 evalE (ArrayCons []) = return $ ArrayVal []
 evalE (ArrayCons (v : vs)) = do
   v' <- evalE v
   res <- evalE (ArrayCons vs)
   case res of
     ArrayVal vs' -> return $ ArrayVal (v' : vs')
-    _ -> return NilVal
+    _ -> return $ ErrorVal "invalid array operation"
 evalE (ArrayIndex e1 e2) = do
   name <- evalE e1
   case name of
@@ -310,12 +311,16 @@ evaluate e = S.evalState (evalE e)
 evalS :: Statement -> State Store Value
 evalS (Assign lv e) = do
   val <- evalE e
-  let ref = resolve lv
-  update ref val
+  case val of
+    m@(ErrorVal _) -> return m
+    _ -> do let ref = resolve lv
+            update ref val
 evalS (VarDecl n e) = do
   val <- evalE e
-  let ref = (globalTableName, LName n)
-  allocate ref val
+  case val of
+    m@(ErrorVal _) -> return m
+    _ -> do let ref = (globalTableName, LName n)
+            allocate ref val
 evalS (Return e) = do
   val <- evalE e
   functionEpilogue
@@ -351,7 +356,7 @@ evalS (If es b1 b2) = do
 evalS (For ss1 e1 ss2 (Block b1)) =
   let s1 = Block [ss1, While e1 (Block (b1 ++ [ss2]))]
    in eval s1
-evalS _ = return NilVal
+evalS _ = return $ ErrorVal "Unknown Error"
 
 -- evaluate a block to completion
 -- add support for early exit if there is a return
@@ -361,8 +366,10 @@ eval (Block ss) = go ss
     go [] = do return NilVal
     go [s] = evalS s
     go (s : ss) = do
-      evalS s
-      go ss
+      v <- evalS s
+      case v of 
+        m@(ErrorVal _) -> return m
+        _ -> go ss
 
 -- execute a block on a store
 exec :: Block -> Store -> Store
@@ -397,7 +404,7 @@ step (Block w@(While e wb : ss)) = do
           case wb of
             Block bs -> return $ Right $ Block $ bs ++ w
         else -- return (wb : w)
-          return $ Right $ Block ss
+          return $ Right $ Block ss 
 step (Block (Empty : ss)) = step $ Block ss
 step (Block (EndStatement : ss)) = do evalS EndStatement; step $ Block ss
 step (Block (s : ss)) = do

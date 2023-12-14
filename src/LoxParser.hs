@@ -194,8 +194,8 @@ blockP = wsP $ Block <$> many statementP
 
 parseLoxExp :: String -> Either P.ParseError Expression
 parseLoxExp = P.parse expP
-
-parseLoxStat :: String -> Either P.ParseError Statement
+ 
+parseLoxStat :: String -> Either P.ParseError Statement 
 parseLoxStat = P.parse statementP
 
 parseLoxFile :: String -> IO (Either P.ParseError Block)

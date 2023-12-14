@@ -172,6 +172,15 @@ loxRecursion :: Block
 loxRecursion =
   Block [FunctionDef "fib" ["n"] (Block [If (Op2 (Var "n") Le (Val (IntVal 1))) (Block [Return (Var "n")]) (Block [Return (Op2 (FunctionCall (Var "fib") [Op2 (Var "n") Minus (Val (IntVal 1))]) Plus (FunctionCall (Var "fib") [Op2 (Var "n") Minus (Val (IntVal 2))]))])]), VarDecl "x" (FunctionCall (Var "fib") [Val (IntVal 5)])]
 
+loxAssignError :: Block
+loxAssignError = Block [VarDecl "x" (Val (IntVal 10)), Assign (LName "y") (Val (IntVal 5)), VarDecl "z" (Val (IntVal 10))]
+
+loxDeclareError :: Block
+loxDeclareError = Block [VarDecl "x" (Val (IntVal 10)),VarDecl "y" (Val (IntVal 10)),VarDecl "x" (Val (IntVal 10))]
+
+loxFunError :: Block
+loxFunError = Block [FunctionDef "f1" [] (Block [Return (Val (IntVal 0))]), VarDecl "y" (FunctionCall (Var "f2") [Val (IntVal 10)])]
+
 type Id = Int
 
 class PP a where

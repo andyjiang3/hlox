@@ -6,4 +6,4 @@ fun fib(n) {
 	}
 }
 
-var x = fib(5)
+var x = fib(12)
