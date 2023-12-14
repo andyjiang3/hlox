@@ -12,15 +12,21 @@ import LoxStepper
 import LoxSyntax
   ( Block (Block),
     Bop (Divide, Eq, Gt, Minus, Modulo, Plus, Times),
-    Expression (FunctionCall, Op1, Op2, Val, Var, ArrayIndex),
-    LValue (LName, LArrayIndex),
+    Expression (ArrayIndex, FunctionCall, Op1, Op2, Val, Var),
+    LValue (LArrayIndex, LName),
     Name,
-    Statement (Assign, Return, VarDecl, FunctionDef, FunctionCallStatement ),
+    Statement (Assign, FunctionCallStatement, FunctionDef, Return, VarDecl),
     Uop (Neg, Not),
-    Value (BoolVal, FunctionVal, IntVal, NilVal, StringVal, ArrayVal, FunctionValIncomplete, FunctionVal, ErrorVal),
+    Value (ArrayVal, BoolVal, ErrorVal, FunctionVal, FunctionValIncomplete, IntVal, NilVal, StringVal),
     loxAbs,
     loxAdvFunc,
-    loxExp, loxScope, loxAnonFunc, loxClosure, loxArray, loxFstClassFunc, loxMoreClosure
+    loxAnonFunc,
+    loxArray,
+    loxClosure,
+    loxExp,
+    loxFstClassFunc,
+    loxMoreClosure,
+    loxScope,
   )
 import State (State)
 import State qualified as S
@@ -34,11 +40,11 @@ env1 =
         Map.fromList
           [ ( globalTableName,
               Map.fromList
-                [( "x", IntVal 3)]
+                [("x", IntVal 3)]
             ),
             ( "_t1",
               Map.fromList
-                [ ( "y", BoolVal True)
+                [ ("y", BoolVal True)
                 ]
             )
           ],
@@ -52,17 +58,16 @@ env2 =
         Map.fromList
           [ ( globalTableName,
               Map.fromList
-                [( "z", IntVal 3)]
+                [("z", IntVal 3)]
             ),
             ( "_t2",
               Map.fromList
-                [ ( "4", BoolVal True)
+                [ ("4", BoolVal True)
                 ]
             )
           ],
       parent = Just 0
     }
-
 
 env3 :: Environment
 env3 =
@@ -71,11 +76,11 @@ env3 =
         Map.fromList
           [ ( globalTableName,
               Map.fromList
-                [( "y", IntVal 3), ( "x", ArrayVal [IntVal 1, IntVal 2, IntVal 3])]
+                [("y", IntVal 3), ("x", ArrayVal [IntVal 1, IntVal 2, IntVal 3])]
             ),
             ( "_t1",
               Map.fromList
-                [ ( "y", BoolVal True)
+                [ ("y", BoolVal True)
                 ]
             )
           ],
@@ -93,7 +98,6 @@ envs3 = Map.fromList [(0, env3)]
 stack1 = Stk {curr = 0, par = Nothing}
 
 stack2 = Stk {curr = 0, par = Just stack1}
-
 
 extendedStore :: Store
 extendedStore =
@@ -127,11 +131,11 @@ functionEnv =
         Map.fromList
           [ ( globalTableName,
               Map.fromList
-                [( "x", IntVal 3), ( "f", functionVal)]
+                [("x", IntVal 3), ("f", functionVal)]
             ),
             ( "_t1",
               Map.fromList
-                [ ( "y", BoolVal True)
+                [ ("y", BoolVal True)
                 ]
             )
           ],
@@ -162,8 +166,7 @@ wref :: Reference
 wref = ("_t1", LName "0")
 
 arrayRef :: Reference
-arrayRef = ("_G", LArrayIndex (LName "x")  $ Val (IntVal 2))
-
+arrayRef = ("_G", LArrayIndex (LName "x") $ Val (IntVal 2))
 
 arrayStore :: Store
 arrayStore =
@@ -185,7 +188,6 @@ test_index =
         S.evalState (index arrayRef) arrayStore ~?= IntVal 3
       ]
 
-
 tref :: (String, Value)
 tref = ("_G", StringVal "x")
 
@@ -196,7 +198,7 @@ test_update =
       [ S.evalState (update xref (IntVal 4) >> update xref NilVal >> index xref) initialStore ~?= ErrorVal "Cannot find value",
         S.evalState (update yref (IntVal 5) >> index yref) extendedStore ~?= IntVal 5,
         S.evalState (update yref (IntVal 6) >> index yref) extendedStore ~?= IntVal 6,
-        S.evalState (update yref (StringVal "hi")  >> index yref) extendedStore2 ~?= StringVal "hi",
+        S.evalState (update yref (StringVal "hi") >> index yref) extendedStore2 ~?= StringVal "hi",
         S.evalState (update zref (IntVal 30) >> index zref) extendedStore2 ~?= IntVal 30,
         S.evalState (update wref (IntVal 30) >> index wref) extendedStore2 ~?= ErrorVal "Cannot find value"
       ]
@@ -282,32 +284,31 @@ evaluateTests = TestList [test_evaluate_nested, test_evaluate_literals, test_eva
 
 expectedStoreFunc :: Store
 expectedStoreFunc =
-  St {environment = 0, environments =Map.fromList [(0, Env {memory =Map.fromList [("_G",Map.fromList [("t", FunctionVal ["z"] (Block [Assign (LName "x") (Op2 (Var "x") Plus (Val (IntVal 1))), Return (Op2 (Var "z") Plus (Val (IntVal 6)))]) 0), ("x", IntVal 2), ("y", IntVal 2), ("z", IntVal 9)])], parent = Nothing}), (1, Env {memory =Map.fromList [("_G",Map.fromList [("z", IntVal 2)])], parent = Just 0})], stack = Stk {curr = 0, par = Nothing}}
+  St {environment = 0, environments = Map.fromList [(0, Env {memory = Map.fromList [("_G", Map.fromList [("t", FunctionVal ["z"] (Block [Assign (LName "x") (Op2 (Var "x") Plus (Val (IntVal 1))), Return (Op2 (Var "z") Plus (Val (IntVal 6)))]) 0), ("x", IntVal 2), ("y", IntVal 2), ("z", IntVal 9)])], parent = Nothing}), (1, Env {memory = Map.fromList [("_G", Map.fromList [("z", IntVal 2)])], parent = Just 0})], stack = Stk {curr = 0, par = Nothing}}
 
 expectedLoxExp :: Store
-expectedLoxExp = St {environment = 0, environments = Map.fromList [(0, Env {memory =Map.fromList [("_G",Map.fromList [("x1", IntVal 4), ("x2", ErrorVal "Binary operation on invalid types"), ("x3", NilVal), ("x4", ErrorVal "Binary operation on invalid types"), ("x5", BoolVal True), ("x6", BoolVal False), ("x7", BoolVal False)])], parent = Nothing})], stack = Stk {curr = 0, par = Nothing}}
+expectedLoxExp = St {environment = 0, environments = Map.fromList [(0, Env {memory = Map.fromList [("_G", Map.fromList [("x1", IntVal 4), ("x2", ErrorVal "Binary operation on invalid types"), ("x3", NilVal), ("x4", ErrorVal "Binary operation on invalid types"), ("x5", BoolVal True), ("x6", BoolVal False), ("x7", BoolVal False)])], parent = Nothing})], stack = Stk {curr = 0, par = Nothing}}
 
 expectedStoreAbs :: Store
-expectedStoreAbs = St {environment = 0, environments = Map.fromList [(0, Env {memory =Map.fromList [("_G",Map.fromList [("x", IntVal 3)])], parent = Nothing}), (1, Env {memory =Map.fromList [("_G",Map.empty)], parent = Just 0})], stack = Stk {curr = 0, par = Nothing}}
+expectedStoreAbs = St {environment = 0, environments = Map.fromList [(0, Env {memory = Map.fromList [("_G", Map.fromList [("x", IntVal 3)])], parent = Nothing}), (1, Env {memory = Map.fromList [("_G", Map.empty)], parent = Just 0})], stack = Stk {curr = 0, par = Nothing}}
 
 expectedStoreScope :: Store
-expectedStoreScope = St {environment = 0, environments = Map.fromList [(0, Env {memory =Map.fromList [("_G",Map.fromList [("x", IntVal 0), ("y", IntVal 10), ("z", IntVal 40)])], parent = Nothing}), (1, Env {memory =Map.fromList [("_G",Map.fromList [("x", IntVal 10)])], parent = Just 0})], stack = Stk {curr = 0, par = Nothing}}
+expectedStoreScope = St {environment = 0, environments = Map.fromList [(0, Env {memory = Map.fromList [("_G", Map.fromList [("x", IntVal 0), ("y", IntVal 10), ("z", IntVal 40)])], parent = Nothing}), (1, Env {memory = Map.fromList [("_G", Map.fromList [("x", IntVal 10)])], parent = Just 0})], stack = Stk {curr = 0, par = Nothing}}
 
 expectedStoreAnon :: Store
-expectedStoreAnon =  St {environment = 0, environments =Map.fromList [(0, Env {memory =Map.fromList [("_G",Map.fromList [("test", FunctionVal ["a", "b"] (Block [Return (FunctionCall (Var "a") [Var "b"])]) 0), ("x", IntVal 2)])], parent = Nothing}), (1, Env {memory =Map.fromList [("_G",Map.fromList [("a", FunctionVal ["y"] (Block [Return (Op2 (Var "y") Plus (Val (IntVal 1)))]) 1), ("b", IntVal 1)])], parent = Just 0}), (2, Env {memory =Map.fromList [("_G",Map.fromList [("y", IntVal 1)])], parent = Just 1})], stack = Stk {curr = 0, par = Nothing}}
+expectedStoreAnon = St {environment = 0, environments = Map.fromList [(0, Env {memory = Map.fromList [("_G", Map.fromList [("test", FunctionVal ["a", "b"] (Block [Return (FunctionCall (Var "a") [Var "b"])]) 0), ("x", IntVal 2)])], parent = Nothing}), (1, Env {memory = Map.fromList [("_G", Map.fromList [("a", FunctionVal ["y"] (Block [Return (Op2 (Var "y") Plus (Val (IntVal 1)))]) 1), ("b", IntVal 1)])], parent = Just 0}), (2, Env {memory = Map.fromList [("_G", Map.fromList [("y", IntVal 1)])], parent = Just 1})], stack = Stk {curr = 0, par = Nothing}}
 
 expectedStoreClosure :: Store
-expectedStoreClosure = St {environment = 0, environments =Map.fromList [(0, Env {memory =Map.fromList [("_G",Map.fromList [("f2", FunctionVal [] (Block [Return (Var "outside")]) 0), ("outer", FunctionVal [] (Block [VarDecl "outside" (Val (IntVal 5)), FunctionDef "inner" [] (Block [Assign (LName "outside") (Op2 (Var "outside") Plus (Val (IntVal 1))), Return (Var "outside")]), Return (Var "inner")]) 0), ("outside", IntVal 7), ("t", FunctionVal [] (Block [Assign (LName "outside") (Op2 (Var "outside") Plus (Val (IntVal 1))), Return (Var "outside")]) 1), ("x", IntVal 6)])], parent = Nothing}), (1, Env {memory =Map.fromList [("_G",Map.fromList [("inner", FunctionVal [] (Block [Assign (LName "outside") (Op2 (Var "outside") Plus (Val (IntVal 1))), Return (Var "outside")]) 1), ("outside", IntVal 6)])], parent = Just 0}), (2, Env {memory =Map.fromList [("_G",Map.fromList [])], parent = Just 1})], stack = Stk {curr = 0, par = Nothing}}
+expectedStoreClosure = St {environment = 0, environments = Map.fromList [(0, Env {memory = Map.fromList [("_G", Map.fromList [("f2", FunctionVal [] (Block [Return (Var "outside")]) 0), ("outer", FunctionVal [] (Block [VarDecl "outside" (Val (IntVal 5)), FunctionDef "inner" [] (Block [Assign (LName "outside") (Op2 (Var "outside") Plus (Val (IntVal 1))), Return (Var "outside")]), Return (Var "inner")]) 0), ("outside", IntVal 7), ("t", FunctionVal [] (Block [Assign (LName "outside") (Op2 (Var "outside") Plus (Val (IntVal 1))), Return (Var "outside")]) 1), ("x", IntVal 6)])], parent = Nothing}), (1, Env {memory = Map.fromList [("_G", Map.fromList [("inner", FunctionVal [] (Block [Assign (LName "outside") (Op2 (Var "outside") Plus (Val (IntVal 1))), Return (Var "outside")]) 1), ("outside", IntVal 6)])], parent = Just 0}), (2, Env {memory = Map.fromList [("_G", Map.fromList [])], parent = Just 1})], stack = Stk {curr = 0, par = Nothing}}
 
 expectedStoreArray :: Store
-expectedStoreArray = St {environment = 0, environments =Map.fromList [(0, Env {memory =Map.fromList [("_G",Map.fromList [("x", ArrayVal [IntVal 1, IntVal 0, IntVal 3]), ("y", IntVal 3), ("z", ArrayVal [ArrayVal [IntVal 1, IntVal 4], ArrayVal [IntVal 2, IntVal 3]])])], parent = Nothing})], stack = Stk {curr = 0, par = Nothing}}
+expectedStoreArray = St {environment = 0, environments = Map.fromList [(0, Env {memory = Map.fromList [("_G", Map.fromList [("x", ArrayVal [IntVal 1, IntVal 0, IntVal 3]), ("y", IntVal 3), ("z", ArrayVal [ArrayVal [IntVal 1, IntVal 4], ArrayVal [IntVal 2, IntVal 3]])])], parent = Nothing})], stack = Stk {curr = 0, par = Nothing}}
 
 expectedStoreFirst :: Store
-expectedStoreFirst = St {environment = 0, environments =Map.fromList [(0, Env {memory =Map.fromList [("_G",Map.fromList [("addSub", FunctionVal ["x"] (Block [FunctionDef "add" ["x"] (Block [Return (Op2 (Var "x") Plus (Val (IntVal 1)))]), FunctionDef "sub" ["x"] (Block [Return (Op2 (Var "x") Minus (Val (IntVal 1)))]), Return (FunctionCall (Var "sub") [FunctionCall (Var "add") [Var "x"]])]) 0), ("x", IntVal 2)])], parent = Nothing}), (1, Env {memory =Map.fromList [("_G",Map.fromList [("add", FunctionVal ["x"] (Block [Return (Op2 (Var "x") Plus (Val (IntVal 1)))]) 1), ("sub", FunctionVal ["x"] (Block [Return (Op2 (Var "x") Minus (Val (IntVal 1)))]) 1), ("x", IntVal 1)])], parent = Just 0}), (2, Env {memory =Map.fromList [("_G",Map.fromList [("x", IntVal 2)])], parent = Just 1}), (3, Env {memory =Map.fromList [("_G",Map.fromList [("x", IntVal 1)])], parent = Just 1}), (4, Env {memory =Map.fromList [("_G",Map.fromList [("add", FunctionVal ["x"] (Block [Return (Op2 (Var "x") Plus (Val (IntVal 1)))]) 4), ("sub", FunctionVal ["x"] (Block [Return (Op2 (Var "x") Minus (Val (IntVal 1)))]) 4), ("x", IntVal 1)])], parent = Just 0}), (5, Env {memory =Map.fromList [("_G",Map.fromList [("x", IntVal 2)])], parent = Just 4}), (6, Env {memory =Map.fromList [("_G",Map.fromList [("x", IntVal 1)])], parent = Just 4})], stack = Stk {curr = 0, par = Nothing}}
+expectedStoreFirst = St {environment = 0, environments = Map.fromList [(0, Env {memory = Map.fromList [("_G", Map.fromList [("addSub", FunctionVal ["x"] (Block [FunctionDef "add" ["x"] (Block [Return (Op2 (Var "x") Plus (Val (IntVal 1)))]), FunctionDef "sub" ["x"] (Block [Return (Op2 (Var "x") Minus (Val (IntVal 1)))]), Return (FunctionCall (Var "sub") [FunctionCall (Var "add") [Var "x"]])]) 0), ("x", IntVal 2)])], parent = Nothing}), (1, Env {memory = Map.fromList [("_G", Map.fromList [("add", FunctionVal ["x"] (Block [Return (Op2 (Var "x") Plus (Val (IntVal 1)))]) 1), ("sub", FunctionVal ["x"] (Block [Return (Op2 (Var "x") Minus (Val (IntVal 1)))]) 1), ("x", IntVal 1)])], parent = Just 0}), (2, Env {memory = Map.fromList [("_G", Map.fromList [("x", IntVal 2)])], parent = Just 1}), (3, Env {memory = Map.fromList [("_G", Map.fromList [("x", IntVal 1)])], parent = Just 1}), (4, Env {memory = Map.fromList [("_G", Map.fromList [("add", FunctionVal ["x"] (Block [Return (Op2 (Var "x") Plus (Val (IntVal 1)))]) 4), ("sub", FunctionVal ["x"] (Block [Return (Op2 (Var "x") Minus (Val (IntVal 1)))]) 4), ("x", IntVal 1)])], parent = Just 0}), (5, Env {memory = Map.fromList [("_G", Map.fromList [("x", IntVal 2)])], parent = Just 4}), (6, Env {memory = Map.fromList [("_G", Map.fromList [("x", IntVal 1)])], parent = Just 4})], stack = Stk {curr = 0, par = Nothing}}
 
-expectedStoreMoreClosure:: Store
-expectedStoreMoreClosure = St {environment = 0, environments =Map.fromList [(0, Env {memory =Map.fromList [("_G",Map.fromList [("outer", FunctionVal [] (Block [VarDecl "outside" (Val (IntVal 0)), FunctionDef "inner" [] (Block [Assign (LName "outside") (Op2 (Var "outside") Plus (Val (IntVal 1))), Return (Var "outside")]), Return (Var "inner")]) 0), ("outside", IntVal 10), ("x", ArrayVal [FunctionVal [] (Block [Assign (LName "outside") (Op2 (Var "outside") Plus (Val (IntVal 1))), Return (Var "outside")]) 1, FunctionVal [] (Block [Assign (LName "outside") (Op2 (Var "outside") Plus (Val (IntVal 1))), Return (Var "outside")]) 2]), ("y", IntVal 3), ("z", IntVal 1)])], parent = Nothing}), (1, Env {memory =Map.fromList [("_G",Map.fromList [("inner", FunctionVal [] (Block [Assign (LName "outside") (Op2 (Var "outside") Plus (Val (IntVal 1))), Return (Var "outside")]) 1), ("outside", IntVal 3)])], parent = Just 0}), (2, Env {memory =Map.fromList [("_G",Map.fromList [("inner", FunctionVal [] (Block [Assign (LName "outside") (Op2 (Var "outside") Plus (Val (IntVal 1))), Return (Var "outside")]) 2), ("outside", IntVal 1)])], parent = Just 0}), (3, Env {memory =Map.fromList [("_G",Map.fromList [])], parent = Just 1}), (4, Env {memory =Map.fromList [("_G",Map.fromList [])], parent = Just 1}), (5, Env {memory =Map.fromList [("_G",Map.fromList [])], parent = Just 1}), (6, Env {memory =Map.fromList [("_G",Map.fromList [])], parent = Just 2})], stack = Stk {curr = 0, par = Nothing}}
-
+expectedStoreMoreClosure :: Store
+expectedStoreMoreClosure = St {environment = 0, environments = Map.fromList [(0, Env {memory = Map.fromList [("_G", Map.fromList [("outer", FunctionVal [] (Block [VarDecl "outside" (Val (IntVal 0)), FunctionDef "inner" [] (Block [Assign (LName "outside") (Op2 (Var "outside") Plus (Val (IntVal 1))), Return (Var "outside")]), Return (Var "inner")]) 0), ("outside", IntVal 10), ("x", ArrayVal [FunctionVal [] (Block [Assign (LName "outside") (Op2 (Var "outside") Plus (Val (IntVal 1))), Return (Var "outside")]) 1, FunctionVal [] (Block [Assign (LName "outside") (Op2 (Var "outside") Plus (Val (IntVal 1))), Return (Var "outside")]) 2]), ("y", IntVal 3), ("z", IntVal 1)])], parent = Nothing}), (1, Env {memory = Map.fromList [("_G", Map.fromList [("inner", FunctionVal [] (Block [Assign (LName "outside") (Op2 (Var "outside") Plus (Val (IntVal 1))), Return (Var "outside")]) 1), ("outside", IntVal 3)])], parent = Just 0}), (2, Env {memory = Map.fromList [("_G", Map.fromList [("inner", FunctionVal [] (Block [Assign (LName "outside") (Op2 (Var "outside") Plus (Val (IntVal 1))), Return (Var "outside")]) 2), ("outside", IntVal 1)])], parent = Just 0}), (3, Env {memory = Map.fromList [("_G", Map.fromList [])], parent = Just 1}), (4, Env {memory = Map.fromList [("_G", Map.fromList [])], parent = Just 1}), (5, Env {memory = Map.fromList [("_G", Map.fromList [])], parent = Just 1}), (6, Env {memory = Map.fromList [("_G", Map.fromList [])], parent = Just 2})], stack = Stk {curr = 0, par = Nothing}}
 
 tExecStepFunc :: Test
 tExecStepFunc =
@@ -320,7 +321,7 @@ tExecStepExp =
   "execStep exp"
     ~: execStep loxExp initialStore
     ~?= Right expectedLoxExp
- 
+
 tExecStepAbs :: Test
 tExecStepAbs =
   "execStep exp"
@@ -333,26 +334,23 @@ tExecScope =
     ~: execStep loxScope initialStore
     ~?= Right expectedStoreScope
 
-
 tExecAnonFunc :: Test
 tExecAnonFunc =
   "execStep exp"
     ~: execStep loxAnonFunc initialStore
     ~?= Right expectedStoreAnon
 
-tExecClosure:: Test
+tExecClosure :: Test
 tExecClosure =
   "execStep exp"
     ~: execStep loxClosure initialStore
     ~?= Right expectedStoreClosure
-
 
 tExecArray :: Test
 tExecArray =
   "execStep exp"
     ~: execStep loxArray initialStore
     ~?= Right expectedStoreArray
-
 
 tExecFirst :: Test
 tExecFirst =
@@ -383,7 +381,7 @@ prop_step_total b s = case S.runState (step b) s of
 prop_stepExec :: Block -> QC.Property
 prop_stepExec b =
   not (final b) QC.==> case result of
-    Left _  -> QC.property True -- You may want to adjust this condition based on your requirements
+    Left _ -> QC.property True -- You may want to adjust this condition based on your requirements
     Right b1 -> final b1 QC.==> m1 == m2
   where
     (result, m1) = S.runState (boundedStep 100 b) initialStore
@@ -395,17 +393,15 @@ prop_evalE_total e s = case evaluate e s of
   IntVal i -> i `seq` True
   BoolVal b -> b `seq` True
   StringVal s -> s `seq` True
-  ArrayVal vs -> vs `seq` True 
+  ArrayVal vs -> vs `seq` True
   FunctionValIncomplete ns bl -> ns `seq` bl `seq` True
-  FunctionVal ns bl id ->  ns `seq` bl `seq` id `seq` True
+  FunctionVal ns bl id -> ns `seq` bl `seq` id `seq` True
   ErrorVal s -> s `seq` True
-
-
 
 test_all :: IO Counts
 test_all = runTestTT $ TestList [test_execStep, evaluateTests, storeTests]
 
-test_programs = runTestTT  test_execStep
+test_programs = runTestTT test_execStep
 
 qc :: IO ()
 qc = do

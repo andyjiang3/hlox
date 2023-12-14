@@ -30,8 +30,8 @@ data Statement
   | While Expression Block -- while (e) { s }
   | For Statement Expression Statement Block -- for (var x = e; e; e) { s }
   | FunctionCallStatement Expression [Expression] -- f(e1, ..., en)
-  | FunctionDef Name [Name] Block -- fun f(x1, ..., xn) { s } 
-  | Return Expression -- return e 
+  | FunctionDef Name [Name] Block -- fun f(x1, ..., xn) { s }
+  | Return Expression -- return e
   | EndStatement -- only used internally
   | Empty -- ';'
   deriving (Eq, Show, Ord)
@@ -61,7 +61,7 @@ data Value -- literals
   | FunctionValIncomplete [Name] Block -- for internal use only
   | ErrorVal String -- raise an error
   | FunctionVal [Name] Block Id -- \(x1, ..., xn) { s }, supports anonymous function
-  deriving 
+  deriving
     ( Eq,
       Show,
       Ord

@@ -11,7 +11,7 @@ import Test.QuickCheck qualified as QC
 
 -- Helper functions --
 wsP :: Parser a -> Parser a
-wsP p = p <* many P.space --da
+wsP p = p <* many P.space -- da
 
 stringP :: String -> Parser ()
 stringP s = wsP (P.string s) *> pure ()
@@ -200,6 +200,3 @@ parseLoxStat = P.parse statementP
 
 parseLoxFile :: String -> IO (Either P.ParseError Block)
 parseLoxFile = P.parseFromFile (const <$> blockP <*> P.eof)
-
--- >>> parseLoxFile "test/programs/10_recursion.lox"
--- Right (Block [FunctionDef "fib" ["n"] (Block [If (Op2 (Var "n") Le (Val (IntVal 1))) (Block [Return (Var "n")]) (Block [Return (Op2 (FunctionCall (Var "fib") [Op2 (Var "n") Minus (Val (IntVal 1))]) Plus (FunctionCall (Var "fib") [Op2 (Var "n") Minus (Val (IntVal 2))]))])]),VarDecl "x" (FunctionCall (Var "fib") [Val (IntVal 5)])])
