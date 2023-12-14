@@ -24,7 +24,7 @@ type Name = String -- name of a variable
 
 -- produce an effect
 data Statement
-  = Assign LValue Expression -- x = e, a[i] = e, TODO: support
+  = Assign LValue Expression -- x = e, a[i] = e
   | VarDecl Name Expression -- var x = e
   | If Expression Block Block -- if (e) { s1 } else { s2 }
   | While Expression Block -- while (e) { s }
@@ -32,7 +32,6 @@ data Statement
   | FunctionCallStatement Expression [Expression] -- f(e1, ..., en)
   | FunctionDef Name [Name] Block -- fun f(x1, ..., xn) { s }
   | Return Expression -- return e
-  | Print Expression -- print e
   | EndStatement -- only used internally
   | Empty -- ';'
   deriving (Eq, Show, Ord)
@@ -50,7 +49,7 @@ data Expression
 
 data LValue
   = LName Name -- x, global variable
-  | LArrayIndex LValue Expression -- a[i], a[i][j], TODO: support
+  | LArrayIndex LValue Expression -- a[i], a[i][j]
   deriving (Eq, Show, Ord)
 
 data Value -- literals
@@ -126,13 +125,6 @@ level Ne = 5
 level And = 4
 level Or = 3
 
--- hello_world.lox
-loxTest :: Block
-loxTest =
-  Block
-    [ Print (Val (StringVal "Hello, world!"))
-    ]
-
 -- abs.lox
 loxAbs :: Block
 loxAbs =
@@ -192,7 +184,7 @@ pretty = PP.render . pp
 -- oneLine = PP.renderStyle (PP.style {PP.mode = PP.OneLineMode}) . pp
 instance PP Uop where
   pp Neg = PP.char '-'
-  pp Not = PP.text "not"
+  pp Not = PP.text "!"
 
 instance PP Bool where
   pp True = PP.text "true"
@@ -206,7 +198,7 @@ instance PP Int where
 
 instance PP LValue where
   pp (LName n) = PP.text n
-  pp _ = undefined
+  pp (LArrayIndex e1 e2) = pp e1 <> PP.brackets (pp e2)
 
 instance PP Value where
   pp (IntVal i) = pp i
@@ -215,11 +207,14 @@ instance PP Value where
   pp (StringVal s) = PP.text ("\"" <> s <> "\"")
   pp (FunctionVal n blk _) = parens (commaSep (map pp n)) <+> PP.text "{" <+> pp blk <+> PP.text "}"
     where
-      parens d = PP.text "(" <> d <> PP.text ")"
+      parens d = PP.text "\\(" <> d <> PP.text ")"
       commaSep = foldr (<+>) (PP.text "") . intersperse (PP.text ",")
   pp (FunctionValIncomplete n blk) = parens (commaSep (map pp n)) <+> PP.text "{" <+> pp blk <+> PP.text "}"
     where
-      parens d = PP.text "(" <> d <> PP.text ")"
+      parens d = PP.text "\\(" <> d <> PP.text ")"
+      commaSep = foldr (<+>) (PP.text "") . intersperse (PP.text ",")
+  pp (ArrayVal vs) = PP.brackets (commaSep (map pp vs))
+    where
       commaSep = foldr (<+>) (PP.text "") . intersperse (PP.text ",")
   pp _ = undefined
 
@@ -233,7 +228,7 @@ instance PP Bop where
   pp Plus = PP.char '+'
   pp Minus = PP.char '-'
   pp Times = PP.char '*'
-  pp Divide = PP.text "//"
+  pp Divide = PP.text "/"
   pp Modulo = PP.text "%"
   pp Gt = PP.char '>'
   pp Ge = PP.text ">="
@@ -259,7 +254,14 @@ instance PP Expression where
     where
       parens d = PP.text "(" <> d <> PP.text ")"
       commaSep = foldr (<+>) (PP.text "") . intersperse (PP.text ",")
-  pp _ = PP.text ""
+  pp (ArrayIndex e1 e2) = ppArrayName e1 <> PP.brackets (pp e2)
+    where
+      parens d = PP.text "(" <> d <> PP.text ")"
+      ppArrayName (Var v) = PP.text v
+      ppArrayName e1 = parens (pp e1)
+  pp (ArrayCons es) = PP.brackets (commaSep (map pp es))
+    where
+      commaSep = foldr (<+>) (PP.text "") . intersperse (PP.text ",")
 
 instance PP Block where
   pp (Block [s]) = pp s
@@ -271,12 +273,16 @@ ppSS ss = PP.vcat (map pp ss)
 instance PP Statement where
   pp (Assign x e) = pp x <+> PP.equals <+> pp e
   pp (If guard b1 b2) =
-    PP.hang (PP.text "if" <+> pp guard <+> PP.text "{") 2 (pp b1)
+    PP.hang (PP.text "if" <+> parens (pp guard) <+> PP.text "{") 2 (pp b1)
       PP.$$ PP.nest 2 (PP.text "} else {" PP.$$ pp b2)
       PP.$$ PP.text "}"
+    where
+      parens d = PP.text "(" <> d <> PP.text ")"
   pp (While guard e) =
-    PP.hang (PP.text "while" <+> pp guard <+> PP.text "{") 2 (pp e)
+    PP.hang (PP.text "while" <+> parens (pp guard) <+> PP.text "{") 2 (pp e)
       PP.$+$ PP.text "}"
+    where
+      parens d = PP.text "(" <> d <> PP.text ")"
   pp (Return x) = PP.text "return" <+> pp x
   pp Empty = PP.semi
   pp EndStatement = PP.semi
@@ -290,7 +296,9 @@ instance PP Statement where
     where
       parens d = PP.text "(" <> d <> PP.text ")"
       commaSep = foldr (<+>) (PP.text "") . intersperse (PP.text ",")
-  pp _ = undefined
+  pp (For s1 e s2 b) =
+    PP.hang (PP.text "for" <+> pp s1 <+> PP.semi <+> pp e <+> PP.semi <+> pp s2 <+> PP.text "{") 2 (pp b)
+      PP.$+$ PP.text "}"
 
 instance (PP a) => PP (Map Value a) where
   pp m = PP.braces (PP.vcat (map ppa (Map.toList m)))

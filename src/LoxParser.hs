@@ -30,7 +30,7 @@ brackets x = P.between (stringP "[") x (stringP "]")
 
 -- Basic parsers --
 valueP :: Parser Value
-valueP = intValP <|> boolValP <|> nilValP <|> stringValP <|> funcValP
+valueP = intValP <|> boolValP <|> nilValP <|> stringValP <|> arrayValP <|> funcValP
 
 intValP :: Parser Value
 intValP = IntVal <$> wsP P.int
@@ -134,7 +134,7 @@ arrayConsP = ArrayCons <$> brackets (P.sepBy expP (stringP ","))
 
 -- Statement parser --
 statementP :: Parser Statement
-statementP = assignP <|> varDecP <|> ifP <|> whileP <|> forP <|> funcCallStatP <|> funcDefP <|> returnP <|> printP <|> emptyP
+statementP = assignP <|> varDecP <|> ifP <|> whileP <|> forP <|> funcCallStatP <|> funcDefP <|> returnP <|> emptyP
 
 varLValueP :: Parser LValue
 varLValueP = process <$> first <*> rest
@@ -183,10 +183,6 @@ funcDefP = FunctionDef <$> (stringP "fun" *> varP) <*> parens (P.sepBy varP (str
 -- return e
 returnP :: Parser Statement
 returnP = Return <$> (stringP "return" *> expP)
-
--- print e
-printP :: Parser Statement
-printP = Print <$> (stringP "print" *> expP)
 
 -- // or ;
 emptyP :: Parser Statement

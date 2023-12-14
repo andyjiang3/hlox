@@ -2,6 +2,7 @@ module ParserTests where
 
 import Control.Applicative
 import Data.Char qualified as Char
+import LoxArbitrary
 import LoxParser
 import LoxSyntax
 import ParserLib (Parser)
@@ -60,8 +61,7 @@ tParseFiles :: Test
 tParseFiles =
   "parse files"
     ~: TestList
-      [ "hello world" ~: p "test/programs/hello_world.lox" loxTest,
-        "abs" ~: p "test/programs/abs.lox" loxAbs,
+      [ "abs" ~: p "test/programs/abs.lox" loxAbs,
         "exp" ~: p "test/programs/exp.lox" loxExp,
         "basic func" ~: p "test/programs/basic_func.lox" loxBasicFunc,
         "adv func" ~: p "test/programs/adv_func.lox" loxAdvFunc
@@ -129,8 +129,7 @@ test_stat =
         P.parse statementP "while (x) { y=4 }" ~?= Right (While (Var "x") (Block [Assign (LName "y") (Val (IntVal 4))])),
         P.parse statementP "f(a1)" ~?= Right (FunctionCallStatement (Var "f") [Var "a1"]),
         P.parse statementP "fun f(x1, x2) { y=4 }" ~?= Right (FunctionDef "f" ["x1", "x2"] (Block [Assign (LName "y") (Val (IntVal 4))])),
-        P.parse statementP "return 4" ~?= Right (Return (Val (IntVal 4))),
-        P.parse statementP "print 4" ~?= Right (Print (Val (IntVal 4)))
+        P.parse statementP "return 4" ~?= Right (Return (Val (IntVal 4)))
       ]
 
 test_all :: IO Counts
@@ -139,20 +138,20 @@ test_all = runTestTT $ TestList [test_wsP, test_stringP, test_constP, test_strin
 -- >>> test_all
 -- Counts {cases = 62, tried = 62, errors = 0, failures = 3}
 
--- prop_roundtrip_val :: Value -> Bool
--- prop_roundtrip_val v = P.parse valueP (pretty v) == Right v
+prop_roundtrip_val :: Value -> Bool
+prop_roundtrip_val v = P.parse valueP (pretty v) == Right v
 
--- prop_roundtrip_exp :: Expression -> Bool
--- prop_roundtrip_exp e = P.parse expP (pretty e) == Right e
+prop_roundtrip_exp :: Expression -> Bool
+prop_roundtrip_exp e = P.parse expP (pretty e) == Right e
 
--- prop_roundtrip_stat :: Statement -> Bool
--- prop_roundtrip_stat s = P.parse statementP (pretty s) == Right s
+prop_roundtrip_stat :: Statement -> Bool
+prop_roundtrip_stat s = P.parse statementP (pretty s) == Right s
 
--- qc :: IO ()
--- qc = do
---   putStrLn "roundtrip_val"
---   QC.quickCheck prop_roundtrip_val
---   putStrLn "roundtrip_exp"
---   QC.quickCheck prop_roundtrip_exp
---   putStrLn "roundtrip_stat"
---   QC.quickCheck prop_roundtrip_stat
+qc :: IO ()
+qc = do
+  putStrLn "roundtrip_val"
+  QC.quickCheck prop_roundtrip_val
+  putStrLn "roundtrip_exp"
+  QC.quickCheck prop_roundtrip_exp
+  putStrLn "roundtrip_stat"
+  QC.quickCheck prop_roundtrip_stat
