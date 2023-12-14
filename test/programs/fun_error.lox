@@ -1,0 +1,6 @@
+fun f1()
+{
+    return 0
+}
+
+var y = f2(10)

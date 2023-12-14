@@ -21,6 +21,10 @@ import Text.Read (readMaybe)
 
 type Table = Map Value Value
 
+type EitherBlock = Either String Block 
+
+type EitherStore = Either String Store
+
 -- local variables a scope is working with, helps find where the correct parent environment is for closures
 data Environment = Env {memory :: Map Name Table, parent :: Maybe Id} deriving (Eq, Show)
 
@@ -71,7 +75,7 @@ index ref@(t, n) = do
   store <- S.get
   indexRecursive ref (environment store)
 
-updateRecursive :: Reference -> Id -> Value -> State Store ()
+updateRecursive :: Reference -> Id -> Value -> State Store Value
 updateRecursive ref@(table, name) id val = do
   store <- S.get
   let newStore :: Maybe Store =
@@ -83,23 +87,25 @@ updateRecursive ref@(table, name) id val = do
           let newMemory = Map.insert table newTable (memory env)
           return $ store {environments = Map.insert id (env {memory = newMemory}) (environments store)}
   case newStore of
-    Just new -> S.put new
+    Just new -> do 
+      S.put new
+      return NilVal
     Nothing -> case environments store !? id of
-      Nothing -> return ()
+      Nothing -> return (ErrorVal ("Variable " ++ pretty name ++  " Does not exists" ))
       Just env -> case parent env of
-        Nothing -> return ()
+        Nothing -> return (ErrorVal ("Variable " ++ pretty name ++  " Does not exists" ))
         Just p -> updateRecursive ref p val
 
 -- updates only existing variable
-update :: Reference -> Value -> State Store ()
-update (_, NilVal) _ = return ()
+update :: Reference -> Value -> State Store Value
+update (_, NilVal) _ = return (ErrorVal "Cannot update value to be nil")
 update ref@(t, n) val = do
   store <- S.get
   updateRecursive ref (environment store) val
 
 -- defines the variable
-allocate :: Reference -> Value -> State Store ()
-allocate (_, NilVal) _ = return ()
+allocate :: Reference -> Value -> State Store Value
+allocate (_, NilVal) _ = return (ErrorVal "Cannot create nil values")
 allocate (table, name) val = do
   store <- S.get
   let newStore :: Maybe Store =
@@ -110,7 +116,11 @@ allocate (table, name) val = do
           let newTable = Map.insert name val oldTable
           let newMemory = Map.insert table newTable (memory env)
           return $ store {environments = Map.insert (environment store) (env {memory = newMemory}) (environments store)}
-  S.put $ fromMaybe store newStore
+  case newStore of 
+    Nothing -> return (ErrorVal ("Multiple definitons. Variable " ++ pretty name ++  "Already exists" ))
+    Just ss -> do 
+      S.put ss
+      return NilVal
 
 resolve :: LValue -> Reference
 resolve (LName n) = (globalTableName, StringVal n)
@@ -179,8 +189,7 @@ evalE (FunctionCall e es) = do
   case fun of
     FunctionVal names blk id -> do
       functionPrologue e names es id
-      val <- eval blk
-      return $ fromMaybe NilVal val
+      eval blk
     _ -> return NilVal
 evalE _ = undefined
 
@@ -214,45 +223,42 @@ evaluate e = S.evalState (evalE e)
 
 -- Everything here is not sure
 
-evalS :: Statement -> State Store (Maybe Value)
+evalS :: Statement -> State Store Value
 evalS (Assign lv e) = do
   val <- evalE e
   let ref = resolve lv
   update ref val
-  return Nothing
 evalS (VarDecl n e) = do
   val <- evalE e
   let ref = (globalTableName, StringVal n)
   allocate ref val
-  return Nothing
 evalS (Return e) = do
   val <- evalE e
   functionEpilogue
-  return (Just val)
+  return  val
 evalS (FunctionDef name names blk) = do
   st <- S.get
   let ref = (globalTableName, StringVal name)
   let fun = FunctionVal names blk (environment st)
   allocate ref fun
-  return Nothing
 evalS (FunctionCallStatement name args) = do
   fun <- evalE name
   case fun of
     FunctionVal names blk id -> do
       functionPrologue name names args id
       eval blk
-    _ -> return Nothing
+    _ -> return $ ErrorVal (pretty fun ++ "Is not a Function")
 evalS EndStatement = do
   exitScope
-  return Nothing
-evalS _ = return Nothing
+  return NilVal
+evalS _ = return NilVal
 
 -- evaluate a block to completion
 -- add support for early exit if there is a return
-eval :: Block -> State Store (Maybe Value)
+eval :: Block -> State Store Value
 eval (Block ss) = go ss
   where
-    go [] = do return Nothing
+    go [] = do return NilVal
     go [s] = evalS s
     go (s : ss) = do
       evalS s
@@ -264,40 +270,53 @@ exec = S.execState . eval
 
 -- step over a block on statement at a time
 -- add support for early exit if there is a return
-step :: Block -> State Store Block
-step b@(Block []) = return b
+step :: Block -> State Store EitherBlock
+step b@(Block []) = return $ Right b
 step (Block (If e (Block b1) (Block b2) : ss)) = do
   v <- evalE e
-  defaultEnterScope
-  return $ Block $ if toBool v then b1 ++ [EndStatement] ++ ss else b2 ++ [EndStatement] ++ ss
+  case v of
+    ErrorVal s -> return $ Left s
+    _ -> do 
+      defaultEnterScope
+      return $ Right $ Block $ if toBool v then b1 ++ [EndStatement] ++ ss else b2 ++ [EndStatement] ++ ss
 step b@(Block (While e wb@(Block []) : ss)) = do
   v <- evalE e
-  if toBool v
-    then return b -- infinite while loop because loop is empty
-    else return $ Block ss
+  case v of 
+    ErrorVal s -> return $ Left s
+    _ -> do
+          if toBool v
+            then return $ Right b -- infinite while loop because loop is empty
+            else return $ Right $ Block ss
 step (Block w@(While e wb : ss)) = do
   v <- evalE e
-  if toBool v
-    then do
-      case wb of
-        Block bs -> return $ Block $ bs ++ w
-    else -- return (wb : w)
-      return $ Block ss
+  case v of 
+    ErrorVal s -> return $ Left s
+    _ -> do
+      if toBool v
+        then do
+          case wb of
+            Block bs -> return $ Right $ Block $ bs ++ w
+        else -- return (wb : w)
+          return $ Right $ Block ss
 step (Block (Empty : ss)) = step $ Block ss
 step (Block (EndStatement : ss)) = do evalS EndStatement; step $ Block ss
 step (Block (s : ss)) = do
-  evalS s
-  return $ Block ss
+  v <- evalS s
+  case v of 
+    ErrorVal s -> return $ Left s 
+    _ -> do return $ Right $ Block ss
 
 -- step opver a block for a number of statements
-boundedStep :: Int -> Block -> State Store Block
+boundedStep :: Int -> Block -> State Store EitherBlock
 boundedStep i b | i > 0 = do
   b' <- step b
-  boundedStep (i - 1) b'
-boundedStep _ b = return b
+  case b' of
+    Left s -> return $ Left s
+    Right b'' ->  boundedStep (i - 1) b''
+boundedStep _ b = return $ Right b
 
 -- exectute bounder step over a store
-steps :: Int -> Block -> Store -> (Block, Store)
+steps :: Int -> Block -> Store -> (EitherBlock, Store)
 steps n block = S.runState (boundedStep n block)
 
 -- test to see if a block has finished
@@ -306,9 +325,11 @@ final (Block []) = True
 final _ = False
 
 -- | Evaluate this block to completion
-execStep :: Block -> Store -> Store
-execStep b | final b = id
-execStep b = uncurry execStep . steps 1 b
+execStep :: Block -> Store -> EitherStore
+execStep b s | final b = Right s
+execStep b s = case steps 1 b s of
+  (Left err, _) -> Left err
+  (Right newBlock, newStore) -> execStep newBlock newStore
 
 data Stepper = Stepper
   { filename :: Maybe String,
@@ -355,7 +376,7 @@ stepper = go initialStepper
         -- run current block to completion
         Just (":r", _) ->
           let s' = exec (block ss) (store ss)
-           in go ss {block = mempty, store = s', history = Just ss}
+           in go ss {block = mempty, store = initialStore, history = Just ss}
         -- next statement (could be multiple)
         Just (":n", strs) -> do
           let numSteps :: Int
@@ -363,16 +384,22 @@ stepper = go initialStepper
                 Just x -> x
                 Nothing -> 1
 
-          let res = exec numSteps ss in go res
+          let res = exec numSteps ss in 
+            case res of 
+              Left err -> do putStrLn ("Runtime Error: " ++ err); go ss {block = mempty, store = initialStore, history = Just ss}
+              Right newStepper -> go newStepper 
           where
             exec n stepper
-              | n <= 0 = stepper
-              | case block stepper of Block xs -> null xs = stepper
-              | otherwise = case history stepper of
-                  Just prevStepper -> exec (n - 1) $ stepper {block = newBlock, store = newStore, history = Just stepper {history = Just prevStepper}}
-                  Nothing -> exec (n - 1) $ stepper {block = newBlock, store = newStore, history = Just stepper}
+              | n <= 0 = Right stepper
+              | case block stepper of Block xs -> null xs = Right stepper
+              | otherwise = case eitherBlock of
+                  Left err -> Left err
+                  Right newBlock ->
+                    case history stepper of
+                      Just prevStepper -> exec (n - 1) $ stepper {block = newBlock, store = newStore, history = Just stepper {history = Just prevStepper}}
+                      Nothing -> exec (n - 1) $ stepper {block = newBlock, store = newStore, history = Just stepper}
               where
-                (newBlock, newStore) = steps 1 (block stepper) (store stepper)
+                (eitherBlock, newStore) = steps 1 (block stepper) (store stepper)
         Just (":p", strs) -> do
           let numSteps :: Int
               numSteps = case readMaybe (concat strs) of

@@ -60,6 +60,7 @@ data Value -- literals
   | StringVal String -- "abd"
   | ArrayVal [Value] -- [v1, ..., vn]
   | FunctionValIncomplete [Name] Block
+  | ErrorVal String -- raise an error
   | FunctionVal [Name] Block Id-- \(x1, ..., xn) { s }, supports anonymous function
   deriving
     ( Eq,

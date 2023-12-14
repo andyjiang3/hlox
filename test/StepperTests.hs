@@ -323,6 +323,6 @@ qc = do
   putStrLn "evalE_total"
   quickCheckN 100 prop_evalE_total
   putStrLn "step_total"
-  -- quickCheckN 100 prop_step_total
-  -- putStrLn "stepExec"
-  -- quickCheckN 100 prop_stepExec
+  quickCheckN 100 prop_step_total
+  putStrLn "stepExec"
+  quickCheckN 100 prop_stepExec
