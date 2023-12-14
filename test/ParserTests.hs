@@ -136,7 +136,7 @@ test_all :: IO Counts
 test_all = runTestTT $ TestList [test_wsP, test_stringP, test_constP, test_stringValP, test_funcValP, test_arrayValP, test_comb, test_value, test_exp, test_stat, tParseFiles]
 
 -- >>> test_all
--- Counts {cases = 62, tried = 62, errors = 0, failures = 3}
+-- Counts {cases = 60, tried = 60, errors = 0, failures = 2}
 
 prop_roundtrip_val :: Value -> Bool
 prop_roundtrip_val v = P.parse valueP (pretty v) == Right v

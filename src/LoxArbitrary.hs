@@ -63,7 +63,7 @@ genStore n = St <$> arbitrary <*> genEnvironments <*> genStack n
 
 instance Arbitrary Store where
   arbitrary = QC.sized genStore
-  shrink = undefined
+  shrink _ = []
 
 -- Syntax generators --
 
