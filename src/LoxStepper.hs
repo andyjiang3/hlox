@@ -7,19 +7,21 @@ import Data.List qualified as List
 import Data.Map (Map, (!?))
 import Data.Map qualified as Map
 import Data.Maybe (fromMaybe, isJust, isNothing)
+import GHC.IO.Handle (hFlush)
 import LoxParser
 import LoxSyntax
 import ParserLib (Parser)
 import ParserLib qualified as P
 import State (State)
 import State qualified as S
+import System.IO (stdout)
 import Test.HUnit (Assertion, Counts, Test (..), assert, runTestTT, (~:), (~?=))
 import Test.QuickCheck qualified as QC
 import Text.PrettyPrint (Doc, (<+>))
 import Text.PrettyPrint qualified as PP
 import Text.Read (readMaybe)
 
-type Table = Map Value Value
+type Table = Map Name Value
 
 type EitherBlock = Either String Block
 
@@ -52,27 +54,73 @@ emptyEnv = Env {memory = Map.singleton globalTableName Map.empty, parent = Nothi
 initialStore :: Store
 initialStore = St {environment = 0, environments = Map.fromList [(0, emptyEnv)], stack = Stk {curr = 0, par = Nothing}}
 
-type Reference = (Name, Value)
+type Reference = (Name, LValue)
 
 getEnvironment :: Id -> State Store (Maybe Environment)
 getEnvironment id = do Map.lookup id . environments <$> S.get
+
+getIndex :: Expression -> Store -> Maybe Int
+getIndex exp store =
+  let st = evalE exp
+   in let v = fst $ S.runState st store
+       in case v of
+            IntVal i -> return i
+            _ -> Nothing
 
 indexRecursive :: Reference -> Id -> State Store Value
 indexRecursive (t, n) id = do
   store <- S.get
   maybeEnv <- getEnvironment id
   let env = fromMaybe emptyEnv maybeEnv
-  let valMaybe = memory env !? t >>= (!? n)
+  let valMaybe = do
+        tb <- memory env !? t
+        case n of
+          LName nm -> memory env !? t >>= (!? nm)
+          ref@(LArrayIndex lv e) -> go ref Just
+            where
+              go :: LValue -> (Value -> Maybe Value) -> Maybe Value
+              go (LArrayIndex rec@(LName n) exp) f = do
+                t <- Map.lookup n tb
+                case t of
+                  ArrayVal vs -> do
+                    idx <- getIndex exp store
+                    arr <- getNthElement idx vs
+                    f arr
+                  _ -> Nothing
+              go (LArrayIndex rec@(LArrayIndex _ _) exp) f = go rec newF
+                where
+                  newF :: Value -> Maybe Value
+                  newF v = case v of
+                    ArrayVal vs -> do
+                      idx <- getIndex exp store
+                      getNthElement idx vs
+                    _ -> Nothing
+              go _ _ = undefined
   case valMaybe of
     Just val -> return val
     Nothing -> case parent env of
       Just p -> indexRecursive (t, n) p
-      Nothing -> return NilVal
+      Nothing -> return $ ErrorVal "Cannot find value"
 
 index :: Reference -> State Store Value
 index ref@(t, n) = do
   store <- S.get
   indexRecursive ref (environment store)
+
+modifyNthElement :: Int -> (a -> Maybe a) -> [a] -> Maybe [a]
+modifyNthElement n f list
+  | n < 0 || n >= length list = Nothing -- Return Nothing for out-of-bounds indices
+  | otherwise =
+      case splitAt n list of
+        (before, x : after) -> do
+          modified <- f x
+          return $ before ++ modified : after
+        _ -> Nothing -- This case should not occur
+
+getNthElement :: Int -> [a] -> Maybe a
+getNthElement n list
+  | n < 0 || n >= length list = Nothing -- Return Nothing for out-of-bounds indices
+  | otherwise = Just (list !! n)
 
 updateRecursive :: Reference -> Id -> Value -> State Store Value
 updateRecursive ref@(table, name) id val = do
@@ -81,31 +129,57 @@ updateRecursive ref@(table, name) id val = do
         do
           env <- environments store !? id
           oldTable <- memory env !? table
-          guard (isJust $ Map.lookup name oldTable)
-          let newTable = Map.insert name val oldTable
-          let newMemory = Map.insert table newTable (memory env)
+          --  guard (isJust $ Map.lookup name oldTable)
+          let maybeTable :: Maybe Table = case name of
+                LName nm -> do
+                  guard (isJust $ Map.lookup nm oldTable)
+                  return $ Map.insert nm val oldTable
+                ref@(LArrayIndex lv e) -> go ref (const $ Just val)
+                  where
+                    go :: LValue -> (Value -> Maybe Value) -> Maybe Table
+                    go (LArrayIndex rec@(LName n) exp) f = do
+                      guard (isJust $ Map.lookup n oldTable)
+                      t <- Map.lookup n oldTable
+                      case t of
+                        ArrayVal vs -> do
+                          idx <- getIndex exp store
+                          arr <- modifyNthElement idx f vs
+                          return $ Map.insert n (ArrayVal arr) oldTable
+                        _ -> Nothing
+                    go (LArrayIndex rec@(LArrayIndex _ _) exp) f = go rec newF
+                      where
+                        newF :: Value -> Maybe Value
+                        newF v = case v of
+                          ArrayVal vs -> do
+                            idx <- getIndex exp store
+                            arr <- modifyNthElement idx f vs
+                            return $ ArrayVal arr
+                          _ -> Nothing
+                    go _ _ = Nothing
+
+          guard (isJust maybeTable)
+          let newMemory = Map.insert table (fromMaybe oldTable maybeTable) (memory env)
           return $ store {environments = Map.insert id (env {memory = newMemory}) (environments store)}
   case newStore of
     Just new -> do
       S.put new
       return NilVal
     Nothing -> case environments store !? id of
-      Nothing -> return (ErrorVal ("Variable " ++ pretty name ++ " Does not exists"))
+      Nothing -> return (ErrorVal ("Variable " ++ pretty name ++ " does not exists"))
       Just env -> case parent env of
-        Nothing -> return (ErrorVal ("Variable " ++ pretty name ++ " Does not exists"))
+        Nothing -> return (ErrorVal ("Variable " ++ pretty name ++ " does not exists"))
         Just p -> updateRecursive ref p val
 
 -- updates only existing variable
 update :: Reference -> Value -> State Store Value
-update (_, NilVal) _ = return (ErrorVal "Cannot update value to be nil")
 update ref@(t, n) val = do
   store <- S.get
   updateRecursive ref (environment store) val
 
 -- defines the variable
 allocate :: Reference -> Value -> State Store Value
-allocate (_, NilVal) _ = return (ErrorVal "Cannot create nil values")
-allocate (table, name) val = do
+allocate (table, LArrayIndex _ _) val = do return (ErrorVal "Cannot allocate Array Index")
+allocate (table, LName name) val = do
   store <- S.get
   let newStore :: Maybe Store =
         do
@@ -116,14 +190,13 @@ allocate (table, name) val = do
           let newMemory = Map.insert table newTable (memory env)
           return $ store {environments = Map.insert (environment store) (env {memory = newMemory}) (environments store)}
   case newStore of
-    Nothing -> return (ErrorVal ("Multiple definitons. Variable " ++ pretty name ++ "Already exists"))
+    Nothing -> return (ErrorVal ("Multiple definitons. Variable " ++ pretty name ++ "already exists"))
     Just ss -> do
       S.put ss
       return NilVal
 
 resolve :: LValue -> Reference
-resolve (LName n) = (globalTableName, StringVal n)
-resolve _ = undefined
+resolve l = (globalTableName, l)
 
 functionPrologue :: Expression -> [Name] -> [Expression] -> Id -> State Store ()
 functionPrologue exp names args id = do
@@ -177,7 +250,7 @@ functionEpilogue :: State Store ()
 functionEpilogue = exitScope
 
 evalE :: Expression -> State Store Value
-evalE (Var name) = index (globalTableName, StringVal name)
+evalE (Var name) = index (globalTableName, LName name)
 evalE (Val (FunctionValIncomplete names blk)) = do FunctionVal names blk . environment <$> S.get
 evalE (Val v) = return v
 evalE (Op2 e1 o e2) = evalOp2 o <$> evalE e1 <*> evalE e2
@@ -189,7 +262,20 @@ evalE (FunctionCall e es) = do
       functionPrologue e names es id
       eval blk
     _ -> return NilVal
-evalE _ = undefined
+evalE (ArrayCons []) = return $ ArrayVal []
+evalE (ArrayCons (v : vs)) = do
+  v' <- evalE v
+  res <- evalE (ArrayCons vs)
+  case res of
+    ArrayVal vs' -> return $ ArrayVal (v' : vs')
+    _ -> return NilVal
+evalE (ArrayIndex e1 e2) = do
+  name <- evalE e1
+  case name of
+    StringVal s -> index (globalTableName, LArrayIndex (LName s) e2)
+    _ -> case e1 of
+      Var nm -> index (globalTableName, LArrayIndex (LName nm) e2)
+      _ -> return (ErrorVal "Not an array")
 
 toBool :: Value -> Bool
 toBool (BoolVal False) = False
@@ -199,7 +285,7 @@ toBool _ = True
 evalOp1 :: Uop -> Value -> State Store Value
 evalOp1 Neg (IntVal i) = return $ IntVal $ -i
 evalOp1 Not v = return $ BoolVal $ not $ toBool v
-evalOp1 _ _ = return NilVal
+evalOp1 _ _ = return $ ErrorVal "Unary operation on invalid types"
 
 evalOp2 :: Bop -> Value -> Value -> Value
 evalOp2 Plus (IntVal i1) (IntVal i2) = IntVal (i1 + i2)
@@ -214,7 +300,7 @@ evalOp2 Gt v1 v2 = BoolVal $ v1 > v2
 evalOp2 Ge v1 v2 = BoolVal $ v1 >= v2
 evalOp2 Lt v1 v2 = BoolVal $ v1 < v2
 evalOp2 Le v1 v2 = BoolVal $ v1 <= v2
-evalOp2 _ _ _ = NilVal
+evalOp2 _ _ _ = ErrorVal "Binary operation on invalid types"
 
 evaluate :: Expression -> Store -> Value
 evaluate e = S.evalState (evalE e)
@@ -228,7 +314,7 @@ evalS (Assign lv e) = do
   update ref val
 evalS (VarDecl n e) = do
   val <- evalE e
-  let ref = (globalTableName, StringVal n)
+  let ref = (globalTableName, LName n)
   allocate ref val
 evalS (Return e) = do
   val <- evalE e
@@ -236,7 +322,7 @@ evalS (Return e) = do
   return val
 evalS (FunctionDef name names blk) = do
   st <- S.get
-  let ref = (globalTableName, StringVal name)
+  let ref = (globalTableName, LName name)
   let fun = FunctionVal names blk (environment st)
   allocate ref fun
 evalS (FunctionCallStatement name args) = do
@@ -245,10 +331,26 @@ evalS (FunctionCallStatement name args) = do
     FunctionVal names blk id -> do
       functionPrologue name names args id
       eval blk
-    _ -> return $ ErrorVal (pretty fun ++ "Is not a Function")
+    _ -> return $ ErrorVal (pretty fun ++ "is not a function")
 evalS EndStatement = do
   exitScope
   return NilVal
+evalS (If es b1 b2) = do
+  v <- evalE es
+  case v of
+    ErrorVal s -> return $ ErrorVal s
+    _ -> do
+      defaultEnterScope
+      x <-
+        ( if toBool v
+            then eval b1
+            else eval b2
+          )
+      exitScope
+      return x
+evalS (For ss1 e1 ss2 (Block b1)) =
+  let s1 = Block [ss1, While e1 (Block (b1 ++ [ss2]))]
+   in eval s1
 evalS _ = return NilVal
 
 -- evaluate a block to completion
@@ -351,7 +453,7 @@ stepper = go initialStepper
     go :: Stepper -> IO ()
     go ss = do
       prompt ss
-      putStr (fromMaybe "Lox" (filename ss) ++ "> ")
+      putStr (fromMaybe "Lox" (filename ss) ++ "> ") *> hFlush stdout
       str <- getLine
       case List.uncons (words str) of
         -- load a file for stepping
@@ -359,7 +461,7 @@ stepper = go initialStepper
           result <- LoxParser.parseLoxFile fn
           case result of
             (Left s) -> do
-              putStrLn "Error Loading or Parsing file"
+              putStrLn "Error loading or parsing file"
               go ss
             (Right blck) -> do
               putStrLn ("Loaded " ++ fn ++ " ,initializing stepper")

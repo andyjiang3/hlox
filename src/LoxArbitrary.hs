@@ -20,6 +20,7 @@ import Text.PrettyPrint (Doc, (<+>))
 import Text.PrettyPrint qualified as PP
 import Text.Read (readMaybe)
 
+-- hi
 quickCheckN :: (QC.Testable prop) => Int -> prop -> IO ()
 quickCheckN n = QC.quickCheckWith $ QC.stdArgs {QC.maxSuccess = n, QC.maxSize = 100}
 

@@ -61,10 +61,16 @@ tParseFiles :: Test
 tParseFiles =
   "parse files"
     ~: TestList
-      [ "abs" ~: p "test/programs/abs.lox" loxAbs,
-        "exp" ~: p "test/programs/exp.lox" loxExp,
-        "basic func" ~: p "test/programs/basic_func.lox" loxBasicFunc,
-        "adv func" ~: p "test/programs/adv_func.lox" loxAdvFunc
+      [ "abs" ~: p "test/programs/1_abs.lox" loxAbs,
+        "exp" ~: p "test/programs/2_exp.lox" loxExp,
+        "scope" ~: p "test/programs/3_scope.lox" loxScope,
+        "func" ~: p "test/programs/4_func.lox" loxAdvFunc,
+        "anon func" ~: p "test/programs/5_anon_func.lox" loxAnonFunc,
+        "closure" ~: p "test/programs/6_closure.lox" loxClosure,
+        "array" ~: p "test/programs/7_array.lox" loxArray,
+        "first class func" ~: p "test/programs/8_first_class_func.lox" loxFstClassFunc,
+        "more closure" ~: p "test/programs/9_more_closure.lox" loxMoreClosure,
+        "recursion" ~: p "test/programs/10_recursion.lox" loxRecursion
       ]
   where
     p fn ast = do
@@ -73,6 +79,7 @@ tParseFiles =
         (Left _) -> assert False
         (Right ast') -> assert (ast == ast')
 
+test_comb :: Test
 test_comb =
   "parsing combinators"
     ~: TestList
@@ -86,6 +93,7 @@ test_comb =
         P.parse (many (brackets (constP "1" 1))) "[1] [  1]   [1 ]" ~?= Right [1, 1, 1]
       ]
 
+test_value :: Test
 test_value =
   "parsing values"
     ~: TestList
@@ -98,6 +106,7 @@ test_value =
         P.parse (many stringValP) "\" a\"   \"b\"" ~?= Right [StringVal " a", StringVal "b"]
       ]
 
+test_exp :: Test
 test_exp =
   "parsing expressions"
     ~: TestList
@@ -115,6 +124,7 @@ test_exp =
         P.parse (many arrayConsP) "[1, 2, 3] [4, 5, 6]" ~?= Right [ArrayCons [Val (IntVal 1), Val (IntVal 2), Val (IntVal 3)], ArrayCons [Val (IntVal 4), Val (IntVal 5), Val (IntVal 6)]]
       ]
 
+test_stat :: Test
 test_stat =
   "parsing statements"
     ~: TestList
@@ -136,7 +146,7 @@ test_all :: IO Counts
 test_all = runTestTT $ TestList [test_wsP, test_stringP, test_constP, test_stringValP, test_funcValP, test_arrayValP, test_comb, test_value, test_exp, test_stat, tParseFiles]
 
 -- >>> test_all
--- Counts {cases = 60, tried = 60, errors = 0, failures = 2}
+-- Counts {cases = 66, tried = 66, errors = 0, failures = 0}
 
 prop_roundtrip_val :: Value -> Bool
 prop_roundtrip_val v = P.parse valueP (pretty v) == Right v
@@ -147,8 +157,8 @@ prop_roundtrip_exp e = P.parse expP (pretty e) == Right e
 prop_roundtrip_stat :: Statement -> Bool
 prop_roundtrip_stat s = P.parse statementP (pretty s) == Right s
 
-qc :: IO ()
-qc = do
+roundtrip_qc :: IO ()
+roundtrip_qc = do
   putStrLn "roundtrip_val"
   QC.quickCheck prop_roundtrip_val
   putStrLn "roundtrip_exp"

@@ -1,0 +1,16 @@
+var outside = 7
+
+fun f2() {
+    return outside
+}
+
+fun outer() {
+    var outside = 5
+    fun inner () {
+        outside = outside + 1
+        return outside
+    }
+    return inner
+}
+var t = outer()
+var x = t() // 6

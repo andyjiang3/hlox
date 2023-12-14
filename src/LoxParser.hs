@@ -11,7 +11,7 @@ import Test.QuickCheck qualified as QC
 
 -- Helper functions --
 wsP :: Parser a -> Parser a
-wsP p = p <* many P.space
+wsP p = p <* many P.space -- da
 
 stringP :: String -> Parser ()
 stringP s = wsP (P.string s) *> pure ()
@@ -174,7 +174,7 @@ funcCallStatP = convertToStat <$> funcCallExpP expP
   where
     convertToStat :: Expression -> Statement
     convertToStat (FunctionCall e es) = FunctionCallStatement e es
-    convertToStat _ = error "Err: convertToStatement should only be called on FunctionCall"
+    convertToStat _ = Empty
 
 -- fun f(x1, ..., xn) { s }
 funcDefP :: Parser Statement

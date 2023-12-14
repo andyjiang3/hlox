@@ -125,49 +125,52 @@ level Ne = 5
 level And = 4
 level Or = 3
 
--- abs.lox
+-- 1_abs.lox
 loxAbs :: Block
 loxAbs =
-  Block
-    [ VarDecl "x" (Op2 (Val (IntVal 0)) Minus (Val (IntVal 3))),
-      If
-        (Op2 (Var "x") Lt (Val (IntVal 0)))
-        (Block [Assign (LName "x") (Op2 (Val (IntVal 0)) Minus (Var "x"))])
-        (Block [])
-    ]
+  Block [VarDecl "x" (Op2 (Val (IntVal 0)) Minus (Val (IntVal 3))), If (Op2 (Var "x") Lt (Val (IntVal 0))) (Block [Assign (LName "x") (Op2 (Val (IntVal 0)) Minus (Var "x"))]) (Block [])]
 
--- exp.lox
+-- 2_exp.lox
 loxExp :: Block
 loxExp =
-  Block
-    [ VarDecl "x1" (Op2 (Val (IntVal 1)) Plus (Val (IntVal 3))),
-      VarDecl "x2" (Op2 (Val (IntVal 1)) Plus (Val NilVal)),
-      VarDecl "x3" (Op2 (Val (IntVal 1)) Divide (Val (IntVal 0))),
-      VarDecl "x4" (Op2 (Val (IntVal 1)) Plus (Val (StringVal "s"))),
-      VarDecl "x5" (Op2 (Val (IntVal 1)) Lt (Val (BoolVal True))),
-      VarDecl "x6" (Op1 Not (Val (IntVal 1))),
-      VarDecl "x7" (Op2 (Val NilVal) Eq (Val (BoolVal True)))
-    ]
+  Block [VarDecl "x1" (Op2 (Val (IntVal 1)) Plus (Val (IntVal 3))), VarDecl "x2" (Op2 (Val (IntVal 1)) Plus (Val NilVal)), VarDecl "x3" (Op2 (Val (IntVal 1)) Divide (Val (IntVal 0))), VarDecl "x4" (Op2 (Val (IntVal 1)) Plus (Val (StringVal "s"))), VarDecl "x5" (Op2 (Val (IntVal 1)) Lt (Val (BoolVal True))), VarDecl "x6" (Op1 Not (Val (IntVal 1))), VarDecl "x7" (Op2 (Val NilVal) Eq (Val (BoolVal True)))]
 
--- basic_func.lox
-loxBasicFunc :: Block
-loxBasicFunc =
-  Block
-    [ VarDecl "x" (Val (IntVal 1)),
-      VarDecl "y" (Val (IntVal 2)),
-      FunctionDef "t" ["z"] (Block [Assign (LName "x") (Op2 (Var "x") Plus (Val (IntVal 1))), Return (Var "z")]),
-      FunctionCallStatement (Var "t") [Var "y"]
-    ]
+-- 3_scope.lox
+loxScope :: Block
+loxScope =
+  Block [VarDecl "x" (Val (IntVal 0)), VarDecl "y" (Val (IntVal 0)), If (Val (BoolVal True)) (Block [VarDecl "x" (Val (IntVal 10)), Assign (LName "y") (Val (IntVal 10))]) (Block []), VarDecl "z" (Op2 (Op2 (Val (IntVal 12)) Times (Val (IntVal 3))) Plus (Val (IntVal 4)))]
 
--- adv_func.lox
+-- 4_func.lox
 loxAdvFunc :: Block
 loxAdvFunc =
-  Block
-    [ VarDecl "x" (Val (IntVal 1)),
-      VarDecl "y" (Val (IntVal 2)),
-      FunctionDef "t" ["z"] (Block [Assign (LName "x") (Op2 (Var "x") Plus (Val (IntVal 1))), Return (Var "z")]),
-      VarDecl "z" (FunctionCall (Var "t") [Var "y"])
-    ]
+  Block [VarDecl "x" (Val (IntVal 1)), VarDecl "y" (Val (IntVal 2)), FunctionDef "t" ["z"] (Block [Assign (LName "x") (Op2 (Var "x") Plus (Val (IntVal 1))), Return (Op2 (Var "z") Plus (Val (IntVal 6)))]), VarDecl "z" (Op2 (FunctionCall (Var "t") [Var "y"]) Plus (Val (IntVal 1))), Empty]
+
+-- 5_anon_func.lox
+loxAnonFunc :: Block
+loxAnonFunc = Block [FunctionDef "test" ["a", "b"] (Block [Return (FunctionCall (Var "a") [Var "b"])]), VarDecl "x" (FunctionCall (Var "test") [Val (FunctionValIncomplete ["y"] (Block [Return (Op2 (Var "y") Plus (Val (IntVal 1)))])), Val (IntVal 1)])]
+
+-- 6_closure.lox
+loxClosure :: Block
+loxClosure = Block [VarDecl "outside" (Val (IntVal 7)), FunctionDef "f2" [] (Block [Return (Var "outside")]), FunctionDef "outer" [] (Block [VarDecl "outside" (Val (IntVal 5)), FunctionDef "inner" [] (Block [Assign (LName "outside") (Op2 (Var "outside") Plus (Val (IntVal 1))), Return (Var "outside")]), Return (Var "inner")]), VarDecl "t" (FunctionCall (Var "outer") []), VarDecl "x" (FunctionCall (Var "t") []), Empty]
+
+-- 7_array.lox
+loxArray :: Block
+loxArray = Block [VarDecl "x" (ArrayCons [Val (IntVal 1), Val (IntVal 2), Val (IntVal 3)]), Assign (LArrayIndex (LName "x") (Val (IntVal 1))) (Val (IntVal 0)), VarDecl "y" (Op2 (ArrayIndex (Var "x") (Val (IntVal 1))) Plus (ArrayIndex (Var "x") (Val (IntVal 2)))), VarDecl "z" (ArrayCons [ArrayCons [Val (IntVal 1), Val (IntVal 2)], ArrayCons [Val (IntVal 2), Val (IntVal 3)]]), Assign (LArrayIndex (LArrayIndex (LName "z") (Val (IntVal 0))) (Val (IntVal 1))) (Val (IntVal 4))]
+
+-- 8_first_class_func.lox
+loxFstClassFunc :: Block
+loxFstClassFunc =
+  Block [FunctionDef "addSub" ["x"] (Block [FunctionDef "add" ["x"] (Block [Return (Op2 (Var "x") Plus (Val (IntVal 1)))]), FunctionDef "sub" ["x"] (Block [Return (Op2 (Var "x") Minus (Val (IntVal 1)))]), Return (FunctionCall (Var "sub") [FunctionCall (Var "add") [Var "x"]])]), VarDecl "x" (Op2 (FunctionCall (Var "addSub") [Val (IntVal 1)]) Plus (FunctionCall (Var "addSub") [Val (IntVal 1)])), Empty]
+
+-- 9_more_closure.lox
+loxMoreClosure :: Block
+loxMoreClosure =
+  Block [VarDecl "outside" (Val (IntVal 10)), FunctionDef "outer" [] (Block [VarDecl "outside" (Val (IntVal 0)), FunctionDef "inner" [] (Block [Assign (LName "outside") (Op2 (Var "outside") Plus (Val (IntVal 1))), Return (Var "outside")]), Return (Var "inner")]), VarDecl "x" (ArrayCons [FunctionCall (Var "outer") [], FunctionCall (Var "outer") []]), FunctionCallStatement (ArrayIndex (Var "x") (Val (IntVal 0))) [], Empty, FunctionCallStatement (ArrayIndex (Var "x") (Val (IntVal 0))) [], Empty, VarDecl "y" (FunctionCall (ArrayIndex (Var "x") (Val (IntVal 0))) []), Empty, VarDecl "z" (FunctionCall (ArrayIndex (Var "x") (Val (IntVal 1))) []), Empty]
+
+-- 10_recursion.lox
+loxRecursion :: Block
+loxRecursion =
+  Block [FunctionDef "fib" ["n"] (Block [If (Op2 (Var "n") Le (Val (IntVal 1))) (Block [Return (Var "n")]) (Block [Return (Op2 (FunctionCall (Var "fib") [Op2 (Var "n") Minus (Val (IntVal 1))]) Plus (FunctionCall (Var "fib") [Op2 (Var "n") Minus (Val (IntVal 2))]))])]), VarDecl "x" (FunctionCall (Var "fib") [Val (IntVal 5)])]
 
 type Id = Int
 
@@ -216,7 +219,7 @@ instance PP Value where
   pp (ArrayVal vs) = PP.brackets (commaSep (map pp vs))
     where
       commaSep = foldr (<+>) (PP.text "") . intersperse (PP.text ",")
-  pp _ = undefined
+  pp (ErrorVal e) = PP.text e
 
 isBase :: Expression -> Bool
 isBase Val {} = True

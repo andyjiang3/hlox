@@ -1,0 +1,16 @@
+var outside = 10
+
+fun outer() {
+    var outside = 0
+    fun inner () {
+        outside = outside + 1
+        return outside
+    }
+    return inner
+}
+
+var x = [outer(), outer()]
+x[0]() // 1
+x[0]() // 2
+var y = x[0]() // 3
+var z = x[1]() // 1
