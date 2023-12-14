@@ -21,7 +21,7 @@ import Text.Read (readMaybe)
 
 type Table = Map Value Value
 
-type EitherBlock = Either String Block 
+type EitherBlock = Either String Block
 
 type EitherStore = Either String Store
 
@@ -36,7 +36,6 @@ data Stack = Stk {curr :: Id, par :: Maybe Stack} deriving (Eq, Show)
 
 -- Store holds current environment, stack the map of Environemnts
 data Store = St {environment :: Id, environments :: Environments, stack :: Stack} deriving (Eq, Show)
-
 
 instance PP Store where
   pp :: Store -> Doc
@@ -87,13 +86,13 @@ updateRecursive ref@(table, name) id val = do
           let newMemory = Map.insert table newTable (memory env)
           return $ store {environments = Map.insert id (env {memory = newMemory}) (environments store)}
   case newStore of
-    Just new -> do 
+    Just new -> do
       S.put new
       return NilVal
     Nothing -> case environments store !? id of
-      Nothing -> return (ErrorVal ("Variable " ++ pretty name ++  " Does not exists" ))
+      Nothing -> return (ErrorVal ("Variable " ++ pretty name ++ " Does not exists"))
       Just env -> case parent env of
-        Nothing -> return (ErrorVal ("Variable " ++ pretty name ++  " Does not exists" ))
+        Nothing -> return (ErrorVal ("Variable " ++ pretty name ++ " Does not exists"))
         Just p -> updateRecursive ref p val
 
 -- updates only existing variable
@@ -116,9 +115,9 @@ allocate (table, name) val = do
           let newTable = Map.insert name val oldTable
           let newMemory = Map.insert table newTable (memory env)
           return $ store {environments = Map.insert (environment store) (env {memory = newMemory}) (environments store)}
-  case newStore of 
-    Nothing -> return (ErrorVal ("Multiple definitons. Variable " ++ pretty name ++  "Already exists" ))
-    Just ss -> do 
+  case newStore of
+    Nothing -> return (ErrorVal ("Multiple definitons. Variable " ++ pretty name ++ "Already exists"))
+    Just ss -> do
       S.put ss
       return NilVal
 
@@ -146,7 +145,6 @@ enterScope :: (Store -> Store) -> State Store ()
 enterScope f = do
   st <- S.get
   S.put $ f st
-
 
 defaultEnterScope :: State Store ()
 defaultEnterScope = do
@@ -235,7 +233,7 @@ evalS (VarDecl n e) = do
 evalS (Return e) = do
   val <- evalE e
   functionEpilogue
-  return  val
+  return val
 evalS (FunctionDef name names blk) = do
   st <- S.get
   let ref = (globalTableName, StringVal name)
@@ -276,20 +274,20 @@ step (Block (If e (Block b1) (Block b2) : ss)) = do
   v <- evalE e
   case v of
     ErrorVal s -> return $ Left s
-    _ -> do 
+    _ -> do
       defaultEnterScope
       return $ Right $ Block $ if toBool v then b1 ++ [EndStatement] ++ ss else b2 ++ [EndStatement] ++ ss
 step b@(Block (While e wb@(Block []) : ss)) = do
   v <- evalE e
-  case v of 
+  case v of
     ErrorVal s -> return $ Left s
     _ -> do
-          if toBool v
-            then return $ Right b -- infinite while loop because loop is empty
-            else return $ Right $ Block ss
+      if toBool v
+        then return $ Right b -- infinite while loop because loop is empty
+        else return $ Right $ Block ss
 step (Block w@(While e wb : ss)) = do
   v <- evalE e
-  case v of 
+  case v of
     ErrorVal s -> return $ Left s
     _ -> do
       if toBool v
@@ -302,8 +300,8 @@ step (Block (Empty : ss)) = step $ Block ss
 step (Block (EndStatement : ss)) = do evalS EndStatement; step $ Block ss
 step (Block (s : ss)) = do
   v <- evalS s
-  case v of 
-    ErrorVal s -> return $ Left s 
+  case v of
+    ErrorVal s -> return $ Left s
     _ -> do return $ Right $ Block ss
 
 -- step opver a block for a number of statements
@@ -312,7 +310,7 @@ boundedStep i b | i > 0 = do
   b' <- step b
   case b' of
     Left s -> return $ Left s
-    Right b'' ->  boundedStep (i - 1) b''
+    Right b'' -> boundedStep (i - 1) b''
 boundedStep _ b = return $ Right b
 
 -- exectute bounder step over a store
@@ -384,10 +382,10 @@ stepper = go initialStepper
                 Just x -> x
                 Nothing -> 1
 
-          let res = exec numSteps ss in 
-            case res of 
-              Left err -> do putStrLn ("Runtime Error: " ++ err); go ss {block = mempty, store = initialStore, history = Just ss}
-              Right newStepper -> go newStepper 
+          let res = exec numSteps ss
+           in case res of
+                Left err -> do putStrLn ("Runtime Error: " ++ err); go ss {block = mempty, store = initialStore, history = Just ss}
+                Right newStepper -> go newStepper
           where
             exec n stepper
               | n <= 0 = Right stepper

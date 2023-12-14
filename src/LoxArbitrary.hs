@@ -7,8 +7,8 @@ import Data.List qualified as List
 import Data.Map (Map, (!?))
 import Data.Map qualified as Map
 import Data.Maybe (fromMaybe, isJust, isNothing)
-import LoxSyntax
 import LoxStepper
+import LoxSyntax
 import ParserLib (Parser)
 import ParserLib qualified as P
 import State (State)
@@ -19,7 +19,6 @@ import Test.QuickCheck qualified as QC
 import Text.PrettyPrint (Doc, (<+>))
 import Text.PrettyPrint qualified as PP
 import Text.Read (readMaybe)
-
 
 quickCheckN :: (QC.Testable prop) => Int -> prop -> IO ()
 quickCheckN n = QC.quickCheckWith $ QC.stdArgs {QC.maxSuccess = n, QC.maxSize = 100}
@@ -37,17 +36,16 @@ genStringLit = escape <$> QC.listOf (QC.elements stringLitChars)
     stringLitChars :: [Char]
     stringLitChars = filter (\c -> c /= '\"' && (Char.isSpace c || Char.isPrint c)) ['\NUL' .. '~']
 
-
-
 genId :: Gen Id
 genId = arbitrary
 
 -- Generator for Maybe Id
 genMaybeId :: Gen (Maybe Id)
-genMaybeId = QC.frequency
-  [ (1, pure Nothing)
-  , (2, Just <$> genId)
-  ]
+genMaybeId =
+  QC.frequency
+    [ (1, pure Nothing),
+      (2, Just <$> genId)
+    ]
 
 -- Generator for Table
 genTable :: Gen Table
@@ -64,27 +62,21 @@ genEnvironment = Env <$> genMemory <*> genMaybeId
 genEnvironments :: Gen Environments
 genEnvironments = Map.fromList <$> QC.listOf ((,) <$> genId <*> genEnvironment)
 
-
-
-
-
 genMaybe :: Gen a -> Gen (Maybe a)
 genMaybe ga = QC.chooseInteger (0, 10) >>= \p -> if p < 5 then ga >>= \x -> return (Just x) else return Nothing
 
-
 genStack :: Int -> Gen Stack
 genStack 0 = Stk <$> arbitrary <*> pure Nothing
-genStack n = Stk <$> arbitrary <*> genMaybe stk where
-  stk = genStack (n-1)
+genStack n = Stk <$> arbitrary <*> genMaybe stk
+  where
+    stk = genStack (n - 1)
 
-
-genStore:: Int -> Gen Store
+genStore :: Int -> Gen Store
 genStore n = St <$> arbitrary <*> genEnvironments <*> genStack n
 
-instance Arbitrary Store where 
+instance Arbitrary Store where
   arbitrary = QC.sized genStore
   shrink = undefined
-
 
 genLValue :: Int -> Gen LValue
 genLValue 0 = LName <$> genName
@@ -108,7 +100,6 @@ genExp n =
   where
     n' = n `div` 2
 
-
 genStatement :: Int -> Gen Statement
 genStatement n | n <= 1 = QC.oneof [Assign <$> genLValue 0 <*> genExp 0, return Empty]
 genStatement n =
@@ -122,7 +113,6 @@ genStatement n =
   where
     n' = n `div` 2
 
-
 genBlock :: Int -> Gen Block
 genBlock n = Block <$> genStmts n
   where
@@ -134,8 +124,6 @@ genBlock n = Block <$> genStmts n
         ]
       where
         n' = n `div` 2
-
-
 
 instance Arbitrary Statement where
   arbitrary = QC.sized genStatement
@@ -186,7 +174,6 @@ instance Arbitrary Uop where
 
 instance Arbitrary Bop where
   arbitrary = QC.arbitraryBoundedEnum
-
 
 shrinkStringLit :: String -> [String]
 shrinkStringLit s = filter (/= '\"') <$> shrink s

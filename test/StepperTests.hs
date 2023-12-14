@@ -7,8 +7,8 @@ import Data.List qualified as List
 import Data.Map (Map, (!?))
 import Data.Map qualified as Map
 import Data.Maybe (fromMaybe, isJust, isNothing)
-import LoxStepper
 import LoxArbitrary
+import LoxStepper
 import LoxSyntax
   ( Block (Block),
     Bop (Divide, Eq, Gt, Minus, Modulo, Plus, Times),
@@ -248,13 +248,31 @@ evaluateTests = TestList [test_evaluate_nested, test_evaluate_literals, test_eva
 -- Counts {cases = 21, tried = 21, errors = 0, failures = 0}
 
 expectedStoreFunc :: Store
-expectedStoreFunc = St {environment = 0, 
-environments = Map.fromList [
-  (0, Env {memory = Map.fromList
-   [("_G", Map.fromList
-    [(StringVal "t", FunctionVal ["z"] (Block [Assign (LName "x") (Op2 (Var "x") Plus (Val (IntVal 1))), Return (Var "z")]) 0), 
-    (StringVal "x", IntVal 2), (StringVal "y", IntVal 2), (StringVal "z", IntVal 2)])], parent = Nothing}),
-      (1, Env {memory = Map.fromList [("_G", Map.fromList [(StringVal "z", IntVal 2)])], parent = Just 0})], stack = Stk {curr = 0, par = Nothing}}
+expectedStoreFunc =
+  St
+    { environment = 0,
+      environments =
+        Map.fromList
+          [ ( 0,
+              Env
+                { memory =
+                    Map.fromList
+                      [ ( "_G",
+                          Map.fromList
+                            [ (StringVal "t", FunctionVal ["z"] (Block [Assign (LName "x") (Op2 (Var "x") Plus (Val (IntVal 1))), Return (Var "z")]) 0),
+                              (StringVal "x", IntVal 2),
+                              (StringVal "y", IntVal 2),
+                              (StringVal "z", IntVal 2)
+                            ]
+                        )
+                      ],
+                  parent = Nothing
+                }
+            ),
+            (1, Env {memory = Map.fromList [("_G", Map.fromList [(StringVal "z", IntVal 2)])], parent = Just 0})
+          ],
+      stack = Stk {curr = 0, par = Nothing}
+    }
 
 expectedLoxExp :: Store
 expectedLoxExp = St {environment = 0, environments = Map.fromList [(0, Env {memory = Map.fromList [("_G", Map.fromList [(StringVal "x1", IntVal 4), (StringVal "x2", NilVal), (StringVal "x3", NilVal), (StringVal "x4", NilVal), (StringVal "x5", BoolVal True), (StringVal "x6", BoolVal False), (StringVal "x7", BoolVal False)])], parent = Nothing})], stack = Stk {curr = 0, par = Nothing}}
@@ -286,14 +304,10 @@ test_execStep = TestList [tExecStepFunc, tExecStepAbs, tExecStepExp]
 -- -- -- >>> runTestTT test_execStep
 -- -- -- Counts {cases = 3, tried = 3, errors = 0, failures = 0}
 
-
-
-
 --- Propert based testing
 
 prop_evaluateNot :: Value -> Store -> Bool
 prop_evaluateNot v s = evaluate (Op1 Not (Val v)) s == BoolVal (not $ toBool v)
-
 
 prop_step_total :: Block -> Store -> Bool
 prop_step_total b s = case S.runState (step b) s of
@@ -306,7 +320,6 @@ prop_stepExec b =
     (b1, m1) = S.runState (boundedStep 100 b) initialStore
     m2 = exec b initialStore
 
-
 prop_evalE_total :: Expression -> Store -> Bool
 prop_evalE_total e s = case evaluate e s of
   NilVal -> True
@@ -314,7 +327,6 @@ prop_evalE_total e s = case evaluate e s of
   BoolVal b -> b `seq` True
   StringVal s -> s `seq` True
   _ -> undefined
-
 
 qc :: IO ()
 qc = do
