@@ -273,7 +273,7 @@ evalE (ArrayIndex e1 e2) = do
     StringVal s -> index (globalTableName, LArrayIndex (LName s) e2)
     _ -> case e1 of
       Var nm -> index (globalTableName, LArrayIndex (LName nm) e2)
-      _ -> return (ErrorVal "Not an array")
+      _ -> return (ErrorVal  "Not an array")
 
 toBool :: Value -> Bool
 toBool (BoolVal False) = False

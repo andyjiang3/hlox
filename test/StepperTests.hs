@@ -17,7 +17,7 @@ import LoxSyntax
     Name,
     Statement (Assign, Return),
     Uop (Neg, Not),
-    Value (BoolVal, FunctionVal, IntVal, NilVal, StringVal, ArrayVal, ErrorVal),
+    Value (BoolVal, FunctionVal, IntVal, NilVal, StringVal, ArrayVal, FunctionValIncomplete, FunctionVal, ErrorVal),
     loxAbs,
     loxAdvFunc,
     loxExp,
@@ -117,7 +117,7 @@ functionVal =
    in let args :: [Name] = ["arg1"]
        in let returnExp :: Expression = Op2 (Val (IntVal 1)) Plus (Var "arg1")
            in let statement = Return returnExp
-               in let block = Block []
+               in let block = Block [statement]
                    in FunctionVal args block 0
 
 functionEnv :: Environment
@@ -193,12 +193,12 @@ test_update :: Test
 test_update =
   "index tests"
     ~: TestList
-      [ S.evalState (update xref (IntVal 4) >> update xref NilVal >> index xref) initialStore ~?= NilVal,
+      [ S.evalState (update xref (IntVal 4) >> update xref NilVal >> index xref) initialStore ~?= ErrorVal "Cannot find value",
         S.evalState (update yref (IntVal 5) >> index yref) extendedStore ~?= IntVal 5,
-        S.evalState (update yref NilVal >> index yref) extendedStore ~?= NilVal,
-        S.evalState (update yref NilVal >> index yref) extendedStore2 ~?= NilVal,
+        S.evalState (update yref (IntVal 6) >> index yref) extendedStore ~?= IntVal 6,
+        S.evalState (update yref (StringVal "hi")  >> index yref) extendedStore2 ~?= StringVal "hi",
         S.evalState (update zref (IntVal 30) >> index zref) extendedStore2 ~?= IntVal 30,
-        S.evalState (update wref (IntVal 30) >> index wref) extendedStore2 ~?= NilVal
+        S.evalState (update wref (IntVal 30) >> index wref) extendedStore2 ~?= ErrorVal "Cannot find value"
       ]
 
 test_allocate :: Test
@@ -235,7 +235,7 @@ test_evaluate_binops =
         evaluate (Op2 (Val (IntVal 4)) Times (Val (IntVal 4))) initialStore ~?= IntVal 16,
         evaluate (Op2 (Val (IntVal 9)) Divide (Val (IntVal 2))) initialStore ~?= IntVal 4,
         evaluate (Op2 (Val (IntVal 10)) Modulo (Val (IntVal 4))) initialStore ~?= IntVal 2,
-        evaluate (Op2 (Val (IntVal 10)) Plus (Val (StringVal "hello"))) initialStore ~?= NilVal,
+        evaluate (Op2 (Val (IntVal 10)) Plus (Val (StringVal "hello"))) initialStore ~?= ErrorVal "Binary operation on invalid types",
         evaluate (Op2 (Val (IntVal 4)) Eq (Val (IntVal 4))) initialStore ~?= BoolVal True,
         evaluate (Op2 (Val (IntVal 2)) Gt (Val (IntVal 6))) initialStore ~?= BoolVal False
       ]
@@ -261,7 +261,7 @@ test_evaluate_vars :: Test
 test_evaluate_vars =
   "evaluate vars"
     ~: TestList
-      [ evaluate (Var "x") initialStore ~?= NilVal,
+      [ evaluate (Var "x") initialStore ~?= ErrorVal "Cannot find value",
         evaluate (Var "x") extendedStore ~?= IntVal 3,
         evaluate (Var "x") extendedStore2 ~?= IntVal 3
       ]
@@ -282,60 +282,37 @@ evaluateTests = TestList [test_evaluate_nested, test_evaluate_literals, test_eva
 
 expectedStoreFunc :: Store
 expectedStoreFunc =
-  St
-    { environment = 0,
-      environments =
-        Map.fromList
-          [ ( 0,
-              Env
-                { memory =
-                    Map.fromList
-                      [ ( "_G",
-                          Map.fromList
-                            [ ( "t", FunctionVal ["z"] (Block [Assign (LName "x") (Op2 (Var "x") Plus (Val (IntVal 1))), Return (Var "z")]) 0),
-                              ( "x", IntVal 2),
-                              ( "y", IntVal 2),
-                              ( "z", IntVal 2)
-                            ]
-                        )
-                      ],
-                  parent = Nothing
-                }
-            ),
-            (1, Env {memory = Map.fromList [("_G", Map.fromList [( "z", IntVal 2)])], parent = Just 0})
-          ],
-      stack = Stk {curr = 0, par = Nothing}
-    }
+  St {environment = 0, environments =Map.fromList [(0, Env {memory =Map.fromList [("_G",Map.fromList [("t", FunctionVal ["z"] (Block [Assign (LName "x") (Op2 (Var "x") Plus (Val (IntVal 1))), Return (Var "z")]) 0), ("x", IntVal 2), ("y", IntVal 2), ("z", IntVal 2)])], parent = Nothing}), (1, Env {memory =Map.fromList [("_G",Map.fromList [("z", IntVal 2)])], parent = Just 0})], stack = Stk {curr = 0, par = Nothing}}
 
 expectedLoxExp :: Store
-expectedLoxExp = St {environment = 0, environments = Map.fromList [(0, Env {memory = Map.fromList [("_G", Map.fromList [( "x1", IntVal 4), ( "x2", NilVal), ( "x3", NilVal), ( "x4", NilVal), ( "x5", BoolVal True), ( "x6", BoolVal False), ( "x7", BoolVal False)])], parent = Nothing})], stack = Stk {curr = 0, par = Nothing}}
+expectedLoxExp = St {environment = 0, environments =Map.fromList [(0, Env {memory =Map.fromList [("_G",Map.fromList [("x1", IntVal 4), ("x2", ErrorVal "Binary operation on invalid types"), ("x3", NilVal), ("x4", ErrorVal "Binary operation on invalid types"), ("x5", BoolVal True), ("x6", BoolVal False), ("x7", BoolVal False)])], parent = Nothing})], stack = Stk {curr = 0, par = Nothing}}
 
 expectedStoreAbs :: Store
-expectedStoreAbs = St {environment = 0, environments = Map.fromList [(0, Env {memory = Map.fromList [("_G", Map.fromList [( "x", IntVal 3)])], parent = Nothing}), (1, Env {memory = Map.fromList [("_G", Map.empty)], parent = Just 0})], stack = Stk {curr = 0, par = Nothing}}
+expectedStoreAbs = St {environment = 0, environments =Map.fromList [(0, Env {memory =Map.fromList [("_G",Map.fromList [("x", IntVal 3)])], parent = Nothing}), (1, Env {memory =Map.fromList [("_G",Map.empty)], parent = Just 0})], stack = Stk {curr = 0, par = Nothing}}
 
--- tExecStepFunc :: Test
--- tExecStepFunc =
---   "execStep function"
---     ~: execStep loxAdvFunc initialStore
---     ~?= expectedStoreFunc
+tExecStepFunc :: Test
+tExecStepFunc =
+  "execStep function"
+    ~: execStep loxAdvFunc initialStore
+    ~?= Right expectedStoreFunc
 
--- tExecStepExp :: Test
--- tExecStepExp =
---   "execStep exp"
---     ~: execStep loxExp initialStore
---     ~?= expectedLoxExp
+tExecStepExp :: Test
+tExecStepExp =
+  "execStep exp"
+    ~: execStep loxExp initialStore
+    ~?= Right expectedLoxExp
 
--- tExecStepAbs :: Test
--- tExecStepAbs =
---   "execStep exp"
---     ~: execStep loxAbs initialStore
---     ~?= expectedStoreAbs
+tExecStepAbs :: Test
+tExecStepAbs =
+  "execStep exp"
+    ~: execStep loxAbs initialStore
+    ~?= Right expectedStoreAbs
 
--- test_execStep :: Test
--- test_execStep = TestList [tExecStepFunc, tExecStepAbs, tExecStepExp]
+test_execStep :: Test
+test_execStep = TestList [tExecStepFunc, tExecStepAbs, tExecStepExp]
 
--- -- -- >>> runTestTT test_execStep
--- -- -- Counts {cases = 3, tried = 3, errors = 0, failures = 0}
+-- >>> runTestTT test_execStep
+-- Counts {cases = 3, tried = 3, errors = 0, failures = 0}
 
 --- Propert based testing
 
@@ -346,12 +323,14 @@ prop_step_total :: Block -> Store -> Bool
 prop_step_total b s = case S.runState (step b) s of
   (b', s') -> True
 
--- prop_stepExec :: Block -> QC.Property
--- prop_stepExec b =
---   not (final b) QC.==> final b1 QC.==> m1 == m2
---   where
---     (b1, m1) = S.runState (boundedStep 100 b) initialStore
---     m2 = exec b initialStore
+prop_stepExec :: Block -> QC.Property
+prop_stepExec b =
+  not (final b) QC.==> case result of
+    Left _  -> QC.property True -- You may want to adjust this condition based on your requirements
+    Right b1 -> final b1 QC.==> m1 == m2
+  where
+    (result, m1) = S.runState (boundedStep 100 b) initialStore
+    m2 = exec b initialStore
 
 prop_evalE_total :: Expression -> Store -> Bool
 prop_evalE_total e s = case evaluate e s of
@@ -359,7 +338,10 @@ prop_evalE_total e s = case evaluate e s of
   IntVal i -> i `seq` True
   BoolVal b -> b `seq` True
   StringVal s -> s `seq` True
-  _ -> undefined
+  ArrayVal vs -> vs `seq` True 
+  FunctionValIncomplete ns bl -> ns `seq` bl `seq` True
+  FunctionVal ns bl id ->  ns `seq` bl `seq` id `seq` True
+  ErrorVal s -> s `seq` True
 
 qc :: IO ()
 qc = do
@@ -370,5 +352,4 @@ qc = do
   putStrLn "step_total"
   quickCheckN 100 prop_step_total
   putStrLn "stepExec"
-
--- quickCheckN 100 prop_stepExec
+  quickCheckN 100 prop_stepExec
