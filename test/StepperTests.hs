@@ -20,7 +20,7 @@ import LoxSyntax
     Value (BoolVal, FunctionVal, IntVal, NilVal, StringVal, ArrayVal, FunctionValIncomplete, FunctionVal, ErrorVal),
     loxAbs,
     loxAdvFunc,
-    loxExp, loxScope, loxAnonFunc, loxClosure, loxArrayB
+    loxExp, loxScope, loxAnonFunc, loxClosure, loxArray, loxFstClassFunc, loxMoreClosure
   )
 import State (State)
 import State qualified as S
@@ -282,7 +282,7 @@ evaluateTests = TestList [test_evaluate_nested, test_evaluate_literals, test_eva
 
 expectedStoreFunc :: Store
 expectedStoreFunc =
-  St {environment = 0, environments =Map.fromList [(0, Env {memory =Map.fromList [("_G",Map.fromList [("t", FunctionVal ["z"] (Block [Assign (LName "x") (Op2 (Var "x") Plus (Val (IntVal 1))), Return (Var "z")]) 0), ("x", IntVal 2), ("y", IntVal 2), ("z", IntVal 2)])], parent = Nothing}), (1, Env {memory =Map.fromList [("_G",Map.fromList [("z", IntVal 2)])], parent = Just 0})], stack = Stk {curr = 0, par = Nothing}}
+  St {environment = 0, environments =Map.fromList [(0, Env {memory =Map.fromList [("_G",Map.fromList [("t", FunctionVal ["z"] (Block [Assign (LName "x") (Op2 (Var "x") Plus (Val (IntVal 1))), Return (Op2 (Var "z") Plus (Val (IntVal 6)))]) 0), ("x", IntVal 2), ("y", IntVal 2), ("z", IntVal 9)])], parent = Nothing}), (1, Env {memory =Map.fromList [("_G",Map.fromList [("z", IntVal 2)])], parent = Just 0})], stack = Stk {curr = 0, par = Nothing}}
 
 expectedLoxExp :: Store
 expectedLoxExp = St {environment = 0, environments = Map.fromList [(0, Env {memory =Map.fromList [("_G",Map.fromList [("x1", IntVal 4), ("x2", ErrorVal "Binary operation on invalid types"), ("x3", NilVal), ("x4", ErrorVal "Binary operation on invalid types"), ("x5", BoolVal True), ("x6", BoolVal False), ("x7", BoolVal False)])], parent = Nothing})], stack = Stk {curr = 0, par = Nothing}}
@@ -301,6 +301,12 @@ expectedStoreClosure = St {environment = 0, environments =Map.fromList [(0, Env 
 
 expectedStoreArray :: Store
 expectedStoreArray = St {environment = 0, environments =Map.fromList [(0, Env {memory =Map.fromList [("_G",Map.fromList [("x", ArrayVal [IntVal 1, IntVal 0, IntVal 3]), ("y", IntVal 3), ("z", ArrayVal [ArrayVal [IntVal 1, IntVal 4], ArrayVal [IntVal 2, IntVal 3]])])], parent = Nothing})], stack = Stk {curr = 0, par = Nothing}}
+
+expectedStoreFirst :: Store
+expectedStoreFirst = St {environment = 0, environments =Map.fromList [(0, Env {memory =Map.fromList [("_G",Map.fromList [("addSub", FunctionVal ["x"] (Block [FunctionDef "add" ["x"] (Block [Return (Op2 (Var "x") Plus (Val (IntVal 1)))]), FunctionDef "sub" ["x"] (Block [Return (Op2 (Var "x") Minus (Val (IntVal 1)))]), Return (FunctionCall (Var "sub") [FunctionCall (Var "add") [Var "x"]])]) 0), ("x", IntVal 2)])], parent = Nothing}), (1, Env {memory =Map.fromList [("_G",Map.fromList [("add", FunctionVal ["x"] (Block [Return (Op2 (Var "x") Plus (Val (IntVal 1)))]) 1), ("sub", FunctionVal ["x"] (Block [Return (Op2 (Var "x") Minus (Val (IntVal 1)))]) 1), ("x", IntVal 1)])], parent = Just 0}), (2, Env {memory =Map.fromList [("_G",Map.fromList [("x", IntVal 2)])], parent = Just 1}), (3, Env {memory =Map.fromList [("_G",Map.fromList [("x", IntVal 1)])], parent = Just 1}), (4, Env {memory =Map.fromList [("_G",Map.fromList [("add", FunctionVal ["x"] (Block [Return (Op2 (Var "x") Plus (Val (IntVal 1)))]) 4), ("sub", FunctionVal ["x"] (Block [Return (Op2 (Var "x") Minus (Val (IntVal 1)))]) 4), ("x", IntVal 1)])], parent = Just 0}), (5, Env {memory =Map.fromList [("_G",Map.fromList [("x", IntVal 2)])], parent = Just 4}), (6, Env {memory =Map.fromList [("_G",Map.fromList [("x", IntVal 1)])], parent = Just 4})], stack = Stk {curr = 0, par = Nothing}}
+
+expectedStoreMoreClosure:: Store
+expectedStoreMoreClosure = St {environment = 0, environments =Map.fromList [(0, Env {memory =Map.fromList [("_G",Map.fromList [("outer", FunctionVal [] (Block [VarDecl "outside" (Val (IntVal 0)), FunctionDef "inner" [] (Block [Assign (LName "outside") (Op2 (Var "outside") Plus (Val (IntVal 1))), Return (Var "outside")]), Return (Var "inner")]) 0), ("outside", IntVal 10), ("x", ArrayVal [FunctionVal [] (Block [Assign (LName "outside") (Op2 (Var "outside") Plus (Val (IntVal 1))), Return (Var "outside")]) 1, FunctionVal [] (Block [Assign (LName "outside") (Op2 (Var "outside") Plus (Val (IntVal 1))), Return (Var "outside")]) 2]), ("y", IntVal 3), ("z", IntVal 1)])], parent = Nothing}), (1, Env {memory =Map.fromList [("_G",Map.fromList [("inner", FunctionVal [] (Block [Assign (LName "outside") (Op2 (Var "outside") Plus (Val (IntVal 1))), Return (Var "outside")]) 1), ("outside", IntVal 3)])], parent = Just 0}), (2, Env {memory =Map.fromList [("_G",Map.fromList [("inner", FunctionVal [] (Block [Assign (LName "outside") (Op2 (Var "outside") Plus (Val (IntVal 1))), Return (Var "outside")]) 2), ("outside", IntVal 1)])], parent = Just 0}), (3, Env {memory =Map.fromList [("_G",Map.fromList [])], parent = Just 1}), (4, Env {memory =Map.fromList [("_G",Map.fromList [])], parent = Just 1}), (5, Env {memory =Map.fromList [("_G",Map.fromList [])], parent = Just 1}), (6, Env {memory =Map.fromList [("_G",Map.fromList [])], parent = Just 2})], stack = Stk {curr = 0, par = Nothing}}
 
 
 tExecStepFunc :: Test
@@ -344,12 +350,24 @@ tExecClosure =
 tExecArray :: Test
 tExecArray =
   "execStep exp"
-    ~: execStep loxArrayB initialStore
+    ~: execStep loxArray initialStore
     ~?= Right expectedStoreArray
 
 
+tExecFirst :: Test
+tExecFirst =
+  "execStep exp"
+    ~: execStep loxFstClassFunc initialStore
+    ~?= Right expectedStoreFirst
+
+tExecMoreClosure :: Test
+tExecMoreClosure =
+  "execStep exp"
+    ~: execStep loxMoreClosure initialStore
+    ~?= Right expectedStoreMoreClosure
+
 test_execStep :: Test
-test_execStep = TestList [tExecStepFunc, tExecStepAbs, tExecStepExp, tExecScope, tExecAnonFunc, tExecClosure, tExecArray]
+test_execStep = TestList [tExecStepFunc, tExecStepAbs, tExecStepExp, tExecScope, tExecAnonFunc, tExecClosure, tExecArray, tExecFirst, tExecMoreClosure]
 
 -- >>> runTestTT test_execStep
 -- Counts {cases = 3, tried = 3, errors = 0, failures = 0}
@@ -381,6 +399,13 @@ prop_evalE_total e s = case evaluate e s of
   FunctionValIncomplete ns bl -> ns `seq` bl `seq` True
   FunctionVal ns bl id ->  ns `seq` bl `seq` id `seq` True
   ErrorVal s -> s `seq` True
+
+
+
+test_all :: IO Counts
+test_all = runTestTT $ TestList [test_execStep, evaluateTests, storeTests]
+
+test_programs = runTestTT  test_execStep
 
 qc :: IO ()
 qc = do
