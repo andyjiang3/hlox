@@ -2,7 +2,7 @@
 
 A tree-walking interpreter for Lox written in Haskell.
 
-Lox is a dynamically typed langugae with a mix of Java and C features, Javascript-like syntax, and precedence that closely matches C. This was designed for [Crafting Interpreters](https://craftinginterpreters.com/), an educational compilers book.
+Lox is a dynamically typed language with a mix of Java and C features, Javascript-like syntax, and precedence that closely matches C. This was designed for [Crafting Interpreters](https://craftinginterpreters.com/), an educational compilers book.
 
 We implemented an extended subset of the language. Our Lox interpreter supports:
 * Basics (functional Lox program)
